@@ -65,6 +65,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AdminBatches = () => {
   const navigate = useNavigate();
@@ -72,11 +82,13 @@ const AdminBatches = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [showAddBatchDialog, setShowAddBatchDialog] = useState(false);
   const [showEditBatchDialog, setShowEditBatchDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [currentBatch, setCurrentBatch] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [batchesData, setBatchesData] = useState([
     {
-      id: 1,
+      _id: 1,
       batchName: "Batch A",
       status: "ongoing",
       teacher: "John Doe",
@@ -84,6 +96,7 @@ const AdminBatches = () => {
       endDate: "2023-06-01",
       scheduleDays: ["Monday", "Wednesday", "Friday"],
       sessionTime: "10:00 AM - 12:00 PM",
+      sessionTopic: "Math, Science",
       totalStudents: 20,
       revenue: 2000,
       teacherEarnings: 400,
@@ -117,7 +130,24 @@ const AdminBatches = () => {
     if (now > end) return "completed";
     return "ongoing";
   };
-  
+
+  const fetchBatches = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/batches");
+      const data = await res.json();
+      setBatchesData(data);
+    } catch (err) {
+      console.error("Failed to fetch batches", err);
+      toast({
+        title: "Error",
+        description: "Failed to load batches. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -127,16 +157,6 @@ const AdminBatches = () => {
         setTeachersData(data);
       } catch (err) {
         console.error("Failed to fetch teachers", err);
-      }
-    };
-
-    const fetchBatches = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/batches");
-        const data = await res.json();
-        setBatchesData(data);
-      } catch (err) {
-        console.error("Failed to fetch batches", err);
       }
     };
 
@@ -196,10 +216,10 @@ const AdminBatches = () => {
           teacher: data.teacher,
           startDate: data.startDate,
           endDate: data.endDate,
-          scheduleDays: selectedDays, // Changed from scheduleDays to match schema
-          sessionTime: data.time, // Changed from time to match schema
-          sessionTopic: data.topics, // Changed from topics to match schema format
-          totalStudents: 0, // Add default value for totalStudents
+          scheduleDays: selectedDays,
+          sessionTime: data.time,
+          sessionTopic: data.topics,
+          totalStudents: 0,
         }),
       });
 
@@ -213,6 +233,7 @@ const AdminBatches = () => {
         description: "New batch has been added successfully",
       });
 
+      fetchBatches(); // Refresh batches data
       form.reset();
       setSelectedDays([]);
       setShowAddBatchDialog(false);
@@ -226,31 +247,114 @@ const AdminBatches = () => {
   };
 
   const handleEditBatch = (batchId: number) => {
-    const batch = batchesData.find((b) => b.id === batchId);
+    const batch = batchesData.find((b) => b._id === batchId);
     if (batch) {
       setCurrentBatch(batch);
+      // Format dates for the date input (YYYY-MM-DD)
+      const startDate = batch.startDate.split('T')[0];
+      const endDate = batch.endDate.split('T')[0];
+      
       editForm.reset({
         batchName: batch.batchName,
-        startDate: batch.startDate,
-        endDate: batch.endDate,
+        startDate: startDate,
+        endDate: endDate,
         teacher: batch.teacher,
         time: batch.sessionTime,
-        topics: "",
+        topics: Array.isArray(batch.sessionTopic) 
+          ? batch.sessionTopic.join('\n') 
+          : batch.sessionTopic || "",
       });
       setSelectedDays(batch.scheduleDays);
       setShowEditBatchDialog(true);
     }
   };
 
-  const handleUpdateBatch = (data: any) => {
-    console.log("Updated batch data:", { ...data, scheduleDays: selectedDays });
-    toast({
-      title: "Batch updated",
-      description: "Batch has been successfully updated",
-    });
-    setShowEditBatchDialog(false);
-    editForm.reset();
-    setSelectedDays([]);
+  const handleUpdateBatch = async (data) => {
+    if (!currentBatch) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/batches/${currentBatch._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          batchName: data.batchName,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          scheduleDays: selectedDays,
+          sessionTime: data.time,
+          sessionTopic: data.topics.split('\n').filter(topic => topic.trim()),
+        }),
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok)
+        throw new Error(resData.error || "Something went wrong");
+
+      toast({
+        title: "Batch Updated",
+        description: "Batch has been successfully updated",
+      });
+      
+      fetchBatches(); // Refresh batches data
+      setShowEditBatchDialog(false);
+      editForm.reset();
+      setSelectedDays([]);
+      setCurrentBatch(null);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update batch",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteClick = (batch) => {
+    setCurrentBatch(batch);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!currentBatch) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/batches/${currentBatch._id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete batch");
+      }
+
+      toast({
+        title: "Batch Deleted",
+        description: "The batch has been successfully deleted",
+      });
+      
+      // Remove the batch from local state
+      setBatchesData(batchesData.filter((batch) => batch._id !== currentBatch._id));
+      setShowDeleteDialog(false);
+      setCurrentBatch(null);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const batchesWithStatus = batchesData.map(batch => ({
@@ -258,13 +362,11 @@ const AdminBatches = () => {
     status: getBatchStatus(batch.startDate, batch.endDate)
   }));
   
-
   const filteredBatches = batchesWithStatus.filter(
     (batch) =>
       (batch.batchName?.toLowerCase() || "").includes(searchTerm.toLowerCase()) &&
       (activeTab === "all" || batch.status === activeTab)
   );
-  
 
   return (
     <div className="space-y-6">
@@ -316,9 +418,15 @@ const AdminBatches = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredBatches.length > 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-10">
+                        Loading batches...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredBatches.length > 0 ? (
                     filteredBatches.map((batch) => (
-                      <TableRow key={batch.id}>
+                      <TableRow key={batch._id}>
                         <TableCell className="font-medium">
                           <div>
                             <div>{batch.batchName}</div>
@@ -331,18 +439,14 @@ const AdminBatches = () => {
                         <TableCell>
                           <Badge
                             variant={
-                              new Date() < new Date(batch.startDate)
+                              batch.status === "upcoming"
                                 ? "outline"
-                                : new Date() > new Date(batch.endDate)
+                                : batch.status === "completed"
                                 ? "secondary"
                                 : "default"
                             }
                           >
-                            {new Date() < new Date(batch.startDate)
-                              ? "upcoming"
-                              : new Date() > new Date(batch.endDate)
-                              ? "completed"
-                              : "ongoing"}
+                            {batch.status}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -393,7 +497,7 @@ const AdminBatches = () => {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                navigate(`/admin/batches/${batch.id}`)
+                                navigate(`/admin/batches/${batch._id}`)
                               }
                             >
                               View
@@ -407,12 +511,15 @@ const AdminBatches = () => {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   className="flex items-center"
-                                  onClick={() => handleEditBatch(batch.id)}
+                                  onClick={() => handleEditBatch(batch._id)}
                                 >
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Batch
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="flex items-center text-destructive">
+                                <DropdownMenuItem 
+                                  className="flex items-center text-destructive"
+                                  onClick={() => handleDeleteClick(batch)}
+                                >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete Batch
                                 </DropdownMenuItem>
@@ -439,6 +546,7 @@ const AdminBatches = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Add Batch Dialog - Kept as is */}
       <Dialog open={showAddBatchDialog} onOpenChange={setShowAddBatchDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -613,13 +721,16 @@ const AdminBatches = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Create Batch</Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Creating..." : "Create Batch"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
+      {/* Edit Batch Dialog - Updated */}
       <Dialog open={showEditBatchDialog} onOpenChange={setShowEditBatchDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -760,12 +871,37 @@ const AdminBatches = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Update Batch</Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Updating..." : "Update Batch"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the batch{" "}
+              <span className="font-semibold">{currentBatch?.batchName}</span>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isLoading}
+            >
+              {isLoading ? "Deleting..." : "Delete Batch"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

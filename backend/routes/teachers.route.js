@@ -1,20 +1,33 @@
 import express from "express";
 import Teacher from "../models/teacher.model.js";
+import mongoose from "mongoose";
 
 const router = express.Router();
 
 // POST /api/teachers
 router.post("/", async (req, res) => {
   try {
-    const { name, email, phone} = req.body;
+    const { name, email, phone, specialization, status } = req.body;
 
     if (!name || !email || !phone) {
-      return res.status(400).json({ message: "Name and subject are required." });
+      return res.status(400).json({ message: "Name, email, and phone are required." });
     }
 
-    const newTeacher = new Teacher({ name, email, phone });
-    await newTeacher.save();
+    // Check if email already exists
+    const existingTeacher = await Teacher.findOne({ email });
+    if (existingTeacher) {
+      return res.status(400).json({ message: "Teacher with this email already exists" });
+    }
 
+    const newTeacher = new Teacher({ 
+      name, 
+      email, 
+      phone, 
+      specialization, 
+      status: status || 'active' 
+    });
+    
+    await newTeacher.save();
     res.status(201).json(newTeacher);
   } catch (error) {
     console.error("Error adding teacher:", error);
@@ -22,7 +35,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-
+// GET /api/teachers
 router.get('/', async (req, res) => {
   try {
     const teachers = await Teacher.find();
@@ -30,6 +43,86 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch teachers:", error);
     res.status(500).json({ message: "Failed to fetch teachers" });
+  }
+});
+
+// GET /api/teachers/:id
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Validate ObjectId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid Teacher ID' });
+  }
+
+  try {
+    const teacher = await Teacher.findById(id);
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+    res.json(teacher);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+// PUT /api/teachers/:id - Update a teacher
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, specialization, status } = req.body;
+
+  // Validate ObjectId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid Teacher ID' });
+  }
+
+  try {
+    // Check if email exists for a different teacher
+    if (email) {
+      const existingTeacher = await Teacher.findOne({ email, _id: { $ne: id } });
+      if (existingTeacher) {
+        return res.status(400).json({ message: 'Another teacher with this email already exists' });
+      }
+    }
+
+    const updatedTeacher = await Teacher.findByIdAndUpdate(
+      id,
+      { name, email, phone, specialization, status },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTeacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    res.json(updatedTeacher);
+  } catch (err) {
+    console.error('Error updating teacher:', err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+// DELETE /api/teachers/:id - Delete a teacher
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Validate ObjectId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid Teacher ID' });
+  }
+
+  try {
+    const deletedTeacher = await Teacher.findByIdAndDelete(id);
+
+    if (!deletedTeacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    res.json({ message: 'Teacher deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting teacher:', err);
+    res.status(500).json({ error: 'Server Error' });
   }
 });
 

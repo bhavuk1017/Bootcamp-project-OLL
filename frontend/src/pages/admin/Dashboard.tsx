@@ -1,77 +1,55 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   IndianRupee, 
   Users, 
   School, 
-  TrendingUp, 
-  BarChart3,
   Calendar,
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts';
 
-// Mock data
-const revenueData = [
-  { month: 'Jan', value: 1500 },
-  { month: 'Feb', value: 2300 },
-  { month: 'Mar', value: 3200 },
-  { month: 'Apr', value: 2800 },
-  { month: 'May', value: 3900 },
-  { month: 'Jun', value: 4500 },
-  { month: 'Jul', value: 4000 },
-  { month: 'Aug', value: 5100 },
-  { month: 'Sep', value: 5800 },
-  { month: 'Oct', value: 6300 },
-  { month: 'Nov', value: 6000 },
-  { month: 'Dec', value: 7500 },
-];
-
-const enrollmentData = [
-  { month: 'Jan', value: 12 },
-  { month: 'Feb', value: 19 },
-  { month: 'Mar', value: 25 },
-  { month: 'Apr', value: 22 },
-  { month: 'May', value: 30 },
-  { month: 'Jun', value: 35 },
-  { month: 'Jul', value: 31 },
-  { month: 'Aug', value: 40 },
-  { month: 'Sep', value: 45 },
-  { month: 'Oct', value: 48 },
-  { month: 'Nov', value: 43 },
-  { month: 'Dec', value: 55 },
-];
-
-
 const AdminDashboard = () => {
-  const totalStudents = 156;
-  const totalTeachers = 12;
-  const totalRevenue = 24680;
-  const totalBatches = 15;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalRevenue: 0,
+    totalBatches: 0,
+    revenueData: [],
+    enrollmentData: [],
+    batchesMockData: []
+  });
 
-  const [batchesMockData, setBatchesMockData] = useState([
-    { id: 1, batchName: 'Business Bootcamp - Batch 1', students: 25, revenue: 6250, teacherEarning: 1250, ollShare: 1875 }
-  ]);
-
-  useEffect(()=> {
-    const fetchBatchesData = async () => {
-      // Replace with your API call
-      const response = await fetch('http://localhost:5000/api/batches'); // Adjust the endpoint as needed
-      const data = await response.json();
-      setBatchesMockData(data);
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://localhost:5000/api/dashboard/stats');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+        
+        const data = await response.json();
+        setDashboardData(data);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError(err.message);
+        setLoading(false);
+      }
     };
 
-    fetchBatchesData();
-  },[])
-
-
+    fetchDashboardData();
+  }, []);
 
   const calculateTotalRevenueSplit = () => {
-    const total = batchesMockData.reduce((sum, batch) => sum + batch.revenue, 0);
-    const teacherTotal = batchesMockData.reduce((sum, batch) => sum + (batch.revenue * 0.2), 0);
-    const ollTotal = batchesMockData.reduce((sum, batch) => sum + (batch.ollShare * 0.3), 0);
+    const total = dashboardData.batchesMockData.reduce((sum, batch) => sum + batch.revenue, 0);
+    const teacherTotal = dashboardData.batchesMockData.reduce((sum, batch) => sum + (batch.teacherEarning || 0), 0);
+    const ollTotal = dashboardData.batchesMockData.reduce((sum, batch) => sum + (batch.ollShare || 0), 0);
     const studentTotal = total - teacherTotal - ollTotal;
 
     return {
@@ -83,6 +61,14 @@ const AdminDashboard = () => {
   };
 
   const revenueSplit = calculateTotalRevenueSplit();
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading dashboard data...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -98,7 +84,7 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <IndianRupee className="h-5 w-5 text-success" />
-                <div className="text-2xl font-bold">₹{totalRevenue}</div>
+                <div className="text-2xl font-bold">₹{dashboardData.totalRevenue}</div>
               </div>
               <div className="flex items-center text-xs font-medium text-success">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
@@ -116,7 +102,7 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                <div className="text-2xl font-bold">{totalStudents}</div>
+                <div className="text-2xl font-bold">{dashboardData.totalStudents}</div>
               </div>
               <div className="flex items-center text-xs font-medium text-success">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
@@ -134,7 +120,7 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <School className="h-5 w-5 text-secondary" />
-                <div className="text-2xl font-bold">{totalTeachers}</div>
+                <div className="text-2xl font-bold">{dashboardData.totalTeachers}</div>
               </div>
               <div className="flex items-center text-xs font-medium text-success">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
@@ -152,7 +138,7 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-accent" />
-                <div className="text-2xl font-bold">{totalBatches}</div>
+                <div className="text-2xl font-bold">{dashboardData.totalBatches}</div>
               </div>
               <div className="flex items-center text-xs font-medium text-destructive">
                 <ArrowDownRight className="h-3 w-3 mr-1" />
@@ -172,7 +158,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
+              <AreaChart data={dashboardData.revenueData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis 
                   dataKey="month" 
@@ -205,7 +191,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={enrollmentData}>
+              <LineChart data={dashboardData.enrollmentData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis 
                   dataKey="month" 
@@ -267,14 +253,14 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {batchesMockData.map((batch) => (
-                  <tr key={batch.id} className="border-b transition-colors hover:bg-muted/20">
-                    <td className="p-4 align-middle font-medium">{batch.batchName}</td>
-                    <td className="p-4 align-middle text-center">{batch.students}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.revenue}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.revenue - batch.teacherEarning - batch.ollShare}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.teacherEarning}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.ollShare}</td>
+                {dashboardData.batchesMockData.map((batch, index) => (
+                  <tr key={batch._id || index} className="border-b transition-colors hover:bg-muted/20">
+                    <td className="p-4 align-middle font-medium">{batch.batchName || `Batch ${index + 1}`}</td>
+                    <td className="p-4 align-middle text-center">{batch.students || 0}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.revenue || 0}</td>
+                    <td className="p-4 align-middle text-right">₹{(batch.revenue || 0) - (batch.teacherEarning || 0) - (batch.ollShare || 0)}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.teacherEarning || 0}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.ollShare || 0}</td>
                   </tr>
                 ))}
               </tbody>

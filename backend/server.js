@@ -7,6 +7,7 @@ import batchRoutes from "./routes/batches.route.js";
 import studentRoutes from "./routes/students.route.js";
 import teacherRoutes from "./routes/teachers.route.js";
 import profileRoutes from "./routes/profile.route.js";
+import dashboardRoutes from "./routes/dashboard.route.js"; // Assuming you have a dashboard route
 
 dotenv.config();
 const app = express();
@@ -34,6 +35,7 @@ app.use("/api/batches", batchRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/dashboard", dashboardRoutes); // Assuming you have a dashboard route
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -55,87 +55,22 @@ import {
   XCircle,
   BookOpen,
   School,
-  UserCheck
+  UserCheck,
+  AlertTriangle
 } from 'lucide-react';
 import UserAvatar from '@/components/ui-custom/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from "@/hooks/use-toast";
-
-// Mock students data
-const studentsData = [
-  // {
-  //   id: 1,
-  //   name: 'Alex Johnson',
-  //   email: 'alex@example.com',
-  //   phone: '+1 234-567-8901',
-  //   batch: 'Business Bootcamp - Batch 1',
-  //   status: 'active',
-  //   attendance: 90,
-  //   taskCompletion: 85,
-  //   earnings: 345,
-  //   school: 'Lincoln High School',
-  //   age: 17
-  // },
-  // {
-  //   id: 2,
-  //   name: 'Morgan Smith',
-  //   email: 'morgan@example.com',
-  //   phone: '+1 345-678-9012',
-  //   batch: 'Business Bootcamp - Batch 1',
-  //   status: 'active',
-  //   attendance: 85,
-  //   taskCompletion: 90,
-  //   earnings: 420,
-  //   school: 'Washington High School',
-  //   age: 16
-  // },
-  // {
-  //   id: 3,
-  //   name: 'Jamie Lee',
-  //   email: 'jamie@example.com',
-  //   phone: '+1 456-789-0123',
-  //   batch: 'Business Bootcamp - Batch 2',
-  //   status: 'active',
-  //   attendance: 95,
-  //   taskCompletion: 95,
-  //   earnings: 680,
-  //   school: 'Jefferson High School',
-  //   age: 17
-  // },
-  // {
-  //   id: 4,
-  //   name: 'Taylor Swift',
-  //   email: 'taylor@example.com',
-  //   phone: '+1 567-890-1234',
-  //   batch: 'Business Bootcamp - Batch 2',
-  //   status: 'inactive',
-  //   attendance: 70,
-  //   taskCompletion: 60,
-  //   earnings: 120,
-  //   school: 'Central High School',
-  //   age: 16
-  // },
-  // {
-  //   id: 5,
-  //   name: 'Miguel Santos',
-  //   email: 'miguel@example.com',
-  //   phone: '+1 678-901-2345',
-  //   batch: 'Entrepreneurship 101',
-  //   status: 'pending',
-  //   attendance: 0,
-  //   taskCompletion: 0,
-  //   earnings: 0,
-  //   school: 'Riverside High School',
-  //   age: 15
-  // },
-];
-
-// Mock batch data for filtering
-const batchesData = [
-  // { id: 1, name: "Business Bootcamp - Batch 1" },
-  // { id: 2, name: "Business Bootcamp - Batch 2" },
-  // { id: 3, name: "Entrepreneurship 101" },
-];
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AdminStudents = () => {
   const navigate = useNavigate();
@@ -145,43 +80,14 @@ const AdminStudents = () => {
   const [showAddStudentDialog, setShowAddStudentDialog] = useState(false);
   const [showEditStudentDialog, setShowEditStudentDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState<any>(null);
-  const [studentsData,setStudentsData] = useState([]);
-  const [batchesData,setBatchesData] = useState([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentStudent, setCurrentStudent] = useState(null);
+  const [studentsData, setStudentsData] = useState([]);
+  const [batchesData, setBatchesData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/students");
-        const data = await res.json();
-        setStudentsData(data);
-      } catch (err) {
-        console.error("Failed to fetch students", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchBatches = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/batches");
-        const data = await res.json();
-        setBatchesData(data);
-      } catch (err) {
-        console.error("Failed to fetch batches", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-
-    fetchBatches();
-    fetchStudents();
-  }, []);
-
-  
+  // Form setup
   const form = useForm({
     defaultValues: {
       name: '',
@@ -204,30 +110,62 @@ const AdminStudents = () => {
       school: ''
     }
   });
-  
-  const handleAddStudent = async (data: any) => {
+
+  // Fetch students and batches data
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [studentsRes, batchesRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/students"),
+        axios.get("http://localhost:5000/api/batches")
+      ]);
+      
+      setStudentsData(studentsRes.data);
+      setBatchesData(batchesRes.data);
+    } catch (err) {
+      console.error("Failed to fetch data", err);
+      toast({
+        title: "Error fetching data",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Handle add student form submission
+  const handleAddStudent = async (data) => {
+    setIsSubmitting(true);
     try {
       const response = await axios.post("http://localhost:5000/api/students", data);
-      console.log("New student data:", response.data);
       toast({
         title: "Student added",
         description: "New student has been successfully added"
       });
       setShowAddStudentDialog(false);
       form.reset();
-    } catch (error: any) {
+      // Refresh student list
+      fetchData();
+    } catch (error) {
       console.error("Error adding student:", error);
       toast({
         title: "Error",
         description: error.response?.data?.message || "Something went wrong",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
-  
 
-  const handleEditStudent = (studentId: number) => {
-    const student = studentsData.find(s => s.id === studentId);
+  // Handle edit student functionality
+  const handleEditStudent = (studentId) => {
+    const student = studentsData.find(s => s._id === studentId);
     if (student) {
       setCurrentStudent(student);
       editForm.reset({
@@ -235,23 +173,78 @@ const AdminStudents = () => {
         email: student.email,
         phone: student.phone,
         batch: student.batch,
-        age: student.age.toString(),
-        school: student.school
+        age: student.age?.toString() || '',
+        school: student.school || ''
       });
       setShowEditStudentDialog(true);
     }
   };
 
-  const handleUpdateStudent = (data: any) => {
-    console.log("Updated student data:", data);
-    toast({
-      title: "Student updated",
-      description: "Student has been successfully updated"
-    });
-    setShowEditStudentDialog(false);
-    editForm.reset();
+  // Handle update student form submission
+  const handleUpdateStudent = async (data) => {
+    if (!currentStudent) return;
+    
+    setIsSubmitting(true);
+    try {
+      const response = await axios.patch(
+        `http://localhost:5000/api/students/${currentStudent._id}`, 
+        data
+      );
+      
+      toast({
+        title: "Student updated",
+        description: "Student information has been successfully updated"
+      });
+      
+      setShowEditStudentDialog(false);
+      // Refresh student list
+      fetchData();
+    } catch (error) {
+      console.error("Error updating student:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // Handle delete student functionality
+  const handleDeleteClick = (student) => {
+    setCurrentStudent(student);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteStudent = async () => {
+    if (!currentStudent) return;
+    
+    setIsSubmitting(true);
+    try {
+      await axios.delete(`http://localhost:5000/api/students/${currentStudent._id}`);
+      
+      toast({
+        title: "Student deleted",
+        description: "Student has been successfully removed"
+      });
+      
+      setShowDeleteDialog(false);
+      // Refresh student list
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle bulk upload
   const handleBulkUpload = () => {
     toast({
       title: "Students uploaded",
@@ -260,10 +253,11 @@ const AdminStudents = () => {
     setShowBulkUploadDialog(false);
   };
 
+  // Filter students based on search and filter criteria
   const filteredStudents = studentsData
     .filter(student => 
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      student.email.toLowerCase().includes(searchTerm.toLowerCase())
+      student.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      student.email?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .filter(student => 
       statusFilter === 'all' || student.status === statusFilter
@@ -273,10 +267,6 @@ const AdminStudents = () => {
     );
 
   return (
-
-     
-
-
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold">Manage Students</h1>
@@ -324,8 +314,8 @@ const AdminStudents = () => {
                   <SelectContent>
                     <SelectItem value="all">All Batches</SelectItem>
                     {batchesData.map(batch => (
-                      <SelectItem key={batch.id} value={batch.name}>
-                        {batch.name}
+                      <SelectItem key={batch._id} value={batch.batchName}>
+                        {batch.batchName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -355,144 +345,153 @@ const AdminStudents = () => {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Batch</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Attendance</TableHead>
-                <TableHead>Task Completion</TableHead>
-                <TableHead>Earnings</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length > 0 ? (
-                filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <UserAvatar name={student.name} size="sm" />
-                        <div>
-                          <div className="font-medium">{student.name}</div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Mail className="h-3 w-3" />{student.email}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3" />{student.phone}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="h-4 w-4 text-muted-foreground" />
-                        <span>{student.batch}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={
-                          student.status === 'active' 
-                            ? 'default' 
-                            : student.status === 'pending' 
-                              ? 'outline' 
-                              : 'secondary'
-                        }
-                        className={student.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
-                      >
-                        {student.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-full max-w-24">
-                          <div className="h-2 w-full bg-muted rounded-full">
-                            <div 
-                              className={`h-full rounded-full ${
-                                student.attendance >= 90 ? 'bg-green-500' : 
-                                student.attendance >= 75 ? 'bg-amber-500' : 
-                                'bg-destructive'
-                              }`}
-                              style={{ width: `${student.attendance}%` }}
-                            />
+          {loading ? (
+            <div className="flex justify-center items-center p-8">
+              <p>Loading students...</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Attendance</TableHead>
+                  <TableHead>Task Completion</TableHead>
+                  <TableHead>Earnings</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.length > 0 ? (
+                  filteredStudents.map((student) => (
+                    <TableRow key={student._id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <UserAvatar name={student.name} size="sm" />
+                          <div>
+                            <div className="font-medium">{student.name}</div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Mail className="h-3 w-3" />{student.email}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Phone className="h-3 w-3" />{student.phone}
+                            </div>
                           </div>
                         </div>
-                        <span className="text-xs">{student.attendance}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-full max-w-24">
-                          <div className="h-2 w-full bg-muted rounded-full">
-                            <div 
-                              className={`h-full rounded-full ${
-                                student.taskCompletion >= 90 ? 'bg-green-500' : 
-                                student.taskCompletion >= 75 ? 'bg-amber-500' : 
-                                'bg-destructive'
-                              }`}
-                              style={{ width: `${student.taskCompletion}%` }}
-                            />
-                          </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="h-4 w-4 text-muted-foreground" />
+                          <span>{student.batch}</span>
                         </div>
-                        <span className="text-xs">{student.taskCompletion}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 mr-1 text-green-500" />
-                        ${student.earnings}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/admin/students/${student.id}`)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            student.status === 'active' 
+                              ? 'default' 
+                              : student.status === 'pending' 
+                                ? 'outline' 
+                                : 'secondary'
+                          }
+                          className={student.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
                         >
-                          View
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                              className="flex items-center"
-                              onClick={() => handleEditStudent(student.id)}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Student
-                            </DropdownMenuItem>
-                            {student.status === 'pending' && (
-                              <DropdownMenuItem className="flex items-center text-green-500">
-                                <UserCheck className="h-4 w-4 mr-2" />
-                                Approve Student
+                          {student.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-full max-w-24">
+                            <div className="h-2 w-full bg-muted rounded-full">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  student.attendance >= 90 ? 'bg-green-500' : 
+                                  student.attendance >= 75 ? 'bg-amber-500' : 
+                                  'bg-destructive'
+                                }`}
+                                style={{ width: `${student.attendance}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-xs">{student.attendance}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-full max-w-24">
+                            <div className="h-2 w-full bg-muted rounded-full">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  student.taskCompletion >= 90 ? 'bg-green-500' : 
+                                  student.taskCompletion >= 75 ? 'bg-amber-500' : 
+                                  'bg-destructive'
+                                }`}
+                                style={{ width: `${student.taskCompletion}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-xs">{student.taskCompletion}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <DollarSign className="h-4 w-4 mr-1 text-green-500" />
+                          ${student.earnings}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate(`/admin/students/${student._id}`)}
+                          >
+                            View
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                className="flex items-center"
+                                onClick={() => handleEditStudent(student._id)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Student
                               </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem className="flex items-center text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Student
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                              {student.status === 'pending' && (
+                                <DropdownMenuItem className="flex items-center text-green-500">
+                                  <UserCheck className="h-4 w-4 mr-2" />
+                                  Approve Student
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                className="flex items-center text-destructive"
+                                onClick={() => handleDeleteClick(student)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Student
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No students found matching your criteria.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No students found matching your criteria.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -610,7 +609,7 @@ const AdminStudents = () => {
                       </FormControl>
                       <SelectContent>
                         {batchesData.map(batch => (
-                          <SelectItem key={batch.id} value={batch.batchName.toString()}>
+                          <SelectItem key={batch._id} value={batch.batchName}>
                             {batch.batchName}
                           </SelectItem>
                         ))}
@@ -622,10 +621,17 @@ const AdminStudents = () => {
               />
               
               <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setShowAddStudentDialog(false)}>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => setShowAddStudentDialog(false)}
+                  disabled={isSubmitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Add Student</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Adding..." : "Add Student"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -732,8 +738,8 @@ const AdminStudents = () => {
                       </FormControl>
                       <SelectContent>
                         {batchesData.map(batch => (
-                          <SelectItem key={batch.id} value={batch.name}>
-                            {batch.name}
+                          <SelectItem key={batch._id} value={batch.batchName}>
+                            {batch.batchName}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -744,15 +750,49 @@ const AdminStudents = () => {
               />
               
               <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setShowEditStudentDialog(false)}>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => setShowEditStudentDialog(false)}
+                  disabled={isSubmitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Update Student</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Updating..." : "Update Student"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Student Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Student
+              </div>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {currentStudent?.name}? This action cannot be undone and will remove all their data from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteStudent}
+              disabled={isSubmitting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isSubmitting ? "Deleting..." : "Delete Student"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk Upload Dialog */}
       <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
