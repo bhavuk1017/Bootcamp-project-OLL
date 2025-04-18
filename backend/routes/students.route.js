@@ -1,6 +1,9 @@
 import express from "express";
 import { createStudent } from "../controllers/student.controller.js";
 import Student from "../models/student.model.js"; // Assuming you have a Student model
+import Batch from "../models/batch.model.js"; // Assuming you have a Batch model
+import Teacher from "../models/teacher.model.js"; // Assuming you have a Teacher model
+import { updateStudent } from "../controllers/studentUpdate.controller.js";
 
 const router = express.Router();
 
@@ -27,40 +30,36 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new student
-router.post('/', async (req, res) => {
-  const student = new Student(req.body);
-  try {
-    const newStudent = await student.save();
-    res.status(201).json(newStudent);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
 
 // Update student
-router.patch('/:id', async (req, res) => {
-  try {
-    const updatedStudent = await Student.findByIdAndUpdate(
-      req.params.id, 
-      req.body,
-      { new: true, runValidators: true }
-    );
-    
-    if (!updatedStudent) return res.status(404).json({ message: 'Student not found' });
-    res.json(updatedStudent);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+router.patch('/:id', updateStudent);
 
 // Delete student
 router.delete('/:id', async (req, res) => {
   try {
-    const student = await Student.findByIdAndDelete(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json({ message: 'Student deleted successfully' });
+    const studentId = req.params.id;
+
+    // 1. Delete the student
+    const deletedStudent = await Student.findByIdAndDelete(studentId);
+    if (!deletedStudent) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // 2. Remove student reference from all batches
+    await Batch.updateMany(
+      { students: studentId },
+      { $pull: { students: studentId } }
+    );
+
+    // 3. Remove student reference from all teachers
+    await Teacher.updateMany(
+      { students: studentId },
+      { $pull: { students: studentId } }
+    );
+
+    res.json({ message: 'Student deleted successfully and references cleaned up' });
   } catch (err) {
+    console.error("Error deleting student:", err);
     res.status(500).json({ message: err.message });
   }
 });

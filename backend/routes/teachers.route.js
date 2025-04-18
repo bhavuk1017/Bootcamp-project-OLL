@@ -1,8 +1,15 @@
 import express from "express";
 import Teacher from "../models/teacher.model.js";
+import Batch from "../models/batch.model.js";
+import Student from "../models/student.model.js";
 import mongoose from "mongoose";
+import { getTeacherDashboardData } from "../controllers/teacherController.js";
+// import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
+
+// router.get('/dashboard', authenticateToken, getTeacherDashboardData);
+
 
 // POST /api/teachers
 router.post("/", async (req, res) => {
@@ -107,7 +114,6 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
-  // Validate ObjectId
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: 'Invalid Teacher ID' });
   }
@@ -119,11 +125,23 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
-    res.json({ message: 'Teacher deleted successfully' });
+    // Fix: Clear teacher field (since it's a single ObjectId not an array)
+    await Batch.updateMany(
+      { teacher: id },
+      { $unset: { teacher: "" } } // or use { $set: { teacher: null } }
+    );
+
+    await Student.updateMany(
+      { teachers: id },
+      { $pull: { teachers: id } }
+    );
+
+    res.json({ message: 'Teacher deleted and references cleaned' });
   } catch (err) {
     console.error('Error deleting teacher:', err);
     res.status(500).json({ error: 'Server Error' });
   }
 });
+
 
 export default router;

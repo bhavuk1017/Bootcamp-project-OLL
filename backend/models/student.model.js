@@ -1,59 +1,33 @@
 import mongoose from 'mongoose';
 
 const studentSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
+  name: String,
   role: {
     type: String,
-    default: 'Student',
-    trim: true
+    default: 'Student'
   },
   email: {
     type: String,
     required: true,
-    trim: true,
     lowercase: true
   },
-  phone: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  password: {
-    type: String,
-    required: true
-  },
-  age: {
-    type: Number,
-    required: true
-  },
-  location: {
-    type: String,
-    trim: true
-  },
-  school: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  grade: {
-    type: String,
-    trim: true
-  },
-  joined: {
-    type: String, // storing as string like "June 2023" (optional: use Date if standardized)
-    trim: true
-  },
-  batch: {
-    type: [String], // changed to array to match new structure
-    default: []
-  },
+  phone: String,
+  password: String,
+  age: Number,
+  location: String,
+  school: String,
+  grade: String,
+  joined: String,
+  batches: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Batch'
+  }],
+  teachers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Teacher'
+  }],
   status: {
     type: String,
-    trim: true,
     default: 'active'
   },
   earning: {
@@ -71,6 +45,7 @@ const studentSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
 
 const Student = mongoose.model('Student', studentSchema);
 export default Student;

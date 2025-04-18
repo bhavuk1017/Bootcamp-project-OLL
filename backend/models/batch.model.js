@@ -7,40 +7,26 @@ const batchSchema = new mongoose.Schema({
         trim: true
     },
     teacher: {
-        // type: mongoose.Schema.Types.ObjectId,
-        type: String, // or ObjectId if using MongoDB ObjectId
-        // ref: 'Teacher',  // Assuming the teacher schema is named 'Teacher'
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Teacher',  // Reference to Teacher model
         required: false
     },
-    startDate: {
-        type: Date,
-        required: false
-    },
-    endDate: {
-        type: Date,
-        required: false
-    },
-    scheduleDays: {
-        type: [String], // e.g., ['Monday', 'Wednesday']
-        required: false
-    },
-    sessionTime: {
-        type: String, // or Date if using exact timestamps
-        required: false,
-        trim: true
-    },
-    sessionTopic: {
-        type: String,
-        required: false,
-        trim: true
-    },
+    students: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Student'   // Array of Student ObjectIds
+    }],
+    startDate: Date,
+    endDate: Date,
+    scheduleDays: [String],
+    sessionTime: String,
+    sessionTopic: String,
     totalStudents: {
         type: Number,
         default: 10
     },
     revenue: {
         type: Number,
-        default: 100 // optional in form, calculated later
+        default: 100
     }
 }, {
     timestamps: true

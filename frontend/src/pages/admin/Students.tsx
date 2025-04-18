@@ -86,6 +86,10 @@ const AdminStudents = () => {
   const [batchesData, setBatchesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // For batch name to ID mapping
+  const [batchNameToIdMap, setBatchNameToIdMap] = useState({});
+  const [batchIdToNameMap, setBatchIdToNameMap] = useState({});
 
   // Form setup
   const form = useForm({
@@ -93,7 +97,7 @@ const AdminStudents = () => {
       name: '',
       email: '',
       phone: '',
-      batch: '',
+      batches: [], // Changed from batch to batches to match schema
       age: '',
       school: '',
       password: ''
@@ -105,7 +109,7 @@ const AdminStudents = () => {
       name: '',
       email: '',
       phone: '',
-      batch: '',
+      batches: [], // Changed from batch to batches to match schema
       age: '',
       school: ''
     }
@@ -122,6 +126,18 @@ const AdminStudents = () => {
       
       setStudentsData(studentsRes.data);
       setBatchesData(batchesRes.data);
+      
+      // Create mapping between batch names and IDs
+      const nameToId = {};
+      const idToName = {};
+      batchesRes.data.forEach(batch => {
+        nameToId[batch.batchName] = batch._id;
+        idToName[batch._id] = batch.batchName;
+      });
+      
+      setBatchNameToIdMap(nameToId);
+      setBatchIdToNameMap(idToName);
+      
     } catch (err) {
       console.error("Failed to fetch data", err);
       toast({
@@ -142,7 +158,14 @@ const AdminStudents = () => {
   const handleAddStudent = async (data) => {
     setIsSubmitting(true);
     try {
-      const response = await axios.post("http://localhost:5000/api/students", data);
+      // Convert batch name to batch ID and put in an array
+      const batchId = batchNameToIdMap[data.batches];
+      const studentData = {
+        ...data,
+        batches: batchId ? [batchId] : [] // Use an array of batch IDs as per schema
+      };
+      
+      const response = await axios.post("http://localhost:5000/api/students", studentData);
       toast({
         title: "Student added",
         description: "New student has been successfully added"
@@ -168,14 +191,23 @@ const AdminStudents = () => {
     const student = studentsData.find(s => s._id === studentId);
     if (student) {
       setCurrentStudent(student);
+      
+      // Find batch name from batch ID if available
+      let batchName = '';
+      if (student.batches && student.batches.length > 0) {
+        const batchId = student.batches[0]; // Assuming first batch
+        batchName = batchIdToNameMap[batchId] || '';
+      }
+      
       editForm.reset({
         name: student.name,
         email: student.email,
         phone: student.phone,
-        batch: student.batch,
+        batches: batchName, // Use batch name for display
         age: student.age?.toString() || '',
         school: student.school || ''
       });
+      
       setShowEditStudentDialog(true);
     }
   };
@@ -186,9 +218,17 @@ const AdminStudents = () => {
     
     setIsSubmitting(true);
     try {
+      // Convert batch name to batch ID
+      const batchId = batchNameToIdMap[data.batches];
+      
+      const studentData = {
+        ...data,
+        batches: batchId ? [batchId] : [] // Use an array of batch IDs as per schema
+      };
+      
       const response = await axios.patch(
         `http://localhost:5000/api/students/${currentStudent._id}`, 
-        data
+        studentData
       );
       
       toast({
@@ -253,6 +293,12 @@ const AdminStudents = () => {
     setShowBulkUploadDialog(false);
   };
 
+  // Get batch name from batch ID for display
+  const getBatchNameFromId = (batchId) => {
+    if (!batchId) return '';
+    return batchIdToNameMap[batchId] || 'Unknown Batch';
+  };
+
   // Filter students based on search and filter criteria
   const filteredStudents = studentsData
     .filter(student => 
@@ -262,9 +308,15 @@ const AdminStudents = () => {
     .filter(student => 
       statusFilter === 'all' || student.status === statusFilter
     )
-    .filter(student => 
-      batchFilter === 'all' || student.batch === batchFilter
-    );
+    .filter(student => {
+      if (batchFilter === 'all') return true;
+      // Check if student has the batch ID or name matching the filter
+      if (student.batches && student.batches.length > 0) {
+        return student.batches.includes(batchNameToIdMap[batchFilter]) || 
+               student.batches.some(id => getBatchNameFromId(id) === batchFilter);
+      }
+      return false;
+    });
 
   return (
     <div className="space-y-6">
@@ -335,9 +387,6 @@ const AdminStudents = () => {
               <DropdownMenuItem onClick={() => setShowAddStudentDialog(true)}>
                 Add Single Student
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowBulkUploadDialog(true)}>
-                Bulk Upload Students
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -383,7 +432,11 @@ const AdminStudents = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          <span>{student.batch}</span>
+                          <span>
+                            {student.batches && student.batches.length > 0 
+                              ? getBatchNameFromId(student.batches[0])
+                              : 'No Batch'}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -437,7 +490,7 @@ const AdminStudents = () => {
                       <TableCell>
                         <div className="flex items-center">
                           <DollarSign className="h-4 w-4 mr-1 text-green-500" />
-                          ${student.earnings}
+                          ${student.earning || 0} {/* Changed to match schema (earning instead of earnings) */}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -597,7 +650,7 @@ const AdminStudents = () => {
               
               <FormField
                 control={form.control}
-                name="batch"
+                name="batches"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assign to Batch</FormLabel>
@@ -726,7 +779,7 @@ const AdminStudents = () => {
               
               <FormField
                 control={editForm.control}
-                name="batch"
+                name="batches"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assigned Batch</FormLabel>

@@ -1,51 +1,22 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-const earningEntrySchema = new Schema({
-  month: String,
-  amount: Number
-}, { _id: false });
-
-const teacherSchema = new Schema({
-  name: {
-    type: String,
-    trim: true
-  },
-  email: {
-    type: String,
-    trim: true,
-    lowercase: true
-  },
-  phone: {
-    type: String,
-    trim: true
-  },
-  location: {
-    type: String,
-    trim: true
-  },
-  jobTitle: {
-    type: String,
-    trim: true
-  },
-  yearOfExp: {
-    type: String,
-    trim: true
-  },
+const teacherSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+  phone: String,
+  location: String,
+  jobTitle: String,
+  yearOfExp: String,
   specialization: {
     type: String,
-    trim: true,
     default: "None"
   },
   status: {
     type: String,
-    trim: true,
     default: "Unknown"
   },
-  bio: {
-    type: String,
-    trim: true
-  },
+  bio: String,
   earning: {
     type: Number,
     default: 0
@@ -70,21 +41,23 @@ const teacherSchema = new Schema({
     type: Number,
     default: 0
   },
-  joiningDate: {
-    type: Date
-  },
+  joiningDate: Date,
   batches: [{
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Batch'
   }],
   students: [{
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Student'
   }],
-  earnings: [earningEntrySchema]
+  earnings: [{
+    month: String,
+    amount: Number
+  }]
 }, {
   timestamps: true
 });
+
 
 const Teacher = mongoose.model('Teacher', teacherSchema);
 export default Teacher;

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -92,6 +94,7 @@ const AdminBatches = () => {
       batchName: "Batch A",
       status: "ongoing",
       teacher: "John Doe",
+      teacherId: "123456789", // Added teacherId for reference
       startDate: "2023-01-01",
       endDate: "2023-06-01",
       scheduleDays: ["Monday", "Wednesday", "Friday"],
@@ -106,7 +109,7 @@ const AdminBatches = () => {
   ]);
   const [teachersData, setTeachersData] = useState([
     {
-      id: 1,
+      _id: "123456789", // Updated to _id for MongoDB compatibility
       name: "Jamie Smith",
       email: "jamie.smith@example.com",
       phone: "+1 234-567-8901",
@@ -121,11 +124,26 @@ const AdminBatches = () => {
     },
   ]);
 
+  // Mapping to keep track of teacher IDs to names
+  const [teacherMap, setTeacherMap] = useState<{ [key: string]: string }>({});
+
+  // Define your form schema to match the MongoDB schema
+  const formSchema = z.object({
+    batchName: z.string().min(1, { message: "Batch name is required" }),
+    teacher: z.string().min(1, { message: "Teacher selection is required" }),
+    startDate: z.string().min(1, { message: "Start date is required" }),
+    endDate: z.string().min(1, { message: "End date is required" }),
+    time: z.string().min(1, { message: "Session time is required" }),
+    topics: z.string().min(1, { message: "At least one topic is required" }),
+    totalStudents: z.number().default(10).optional(),
+    revenue: z.number().default(100).optional(),
+  });
+
   const getBatchStatus = (startDate: string, endDate: string) => {
     const now = new Date();
     const start = new Date(startDate);
     const end = new Date(endDate);
-  
+
     if (now < start) return "upcoming";
     if (now > end) return "completed";
     return "ongoing";
@@ -136,7 +154,17 @@ const AdminBatches = () => {
     try {
       const res = await fetch("http://localhost:5000/api/batches");
       const data = await res.json();
-      setBatchesData(data);
+
+      // Process the data to include teacher names
+      const processedData = data.map((batch) => {
+        const teacherName = teacherMap[batch.teacher] || "Unknown Teacher";
+        return {
+          ...batch,
+          teacherName,
+        };
+      });
+
+      setBatchesData(processedData);
     } catch (err) {
       console.error("Failed to fetch batches", err);
       toast({
@@ -155,23 +183,33 @@ const AdminBatches = () => {
         const res = await fetch("http://localhost:5000/api/teachers");
         const data = await res.json();
         setTeachersData(data);
+
+        // Create a mapping of teacher IDs to names
+        const teacherMapping = {};
+        data.forEach((teacher) => {
+          teacherMapping[teacher._id] = teacher.name;
+        });
+        setTeacherMap(teacherMapping);
       } catch (err) {
         console.error("Failed to fetch teachers", err);
       }
     };
 
-    fetchBatches();
     fetchTeachers();
+    fetchBatches();
   }, []);
 
   const form = useForm({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       batchName: "",
+      teacher: "",
       startDate: "",
       endDate: "",
-      teacher: "",
       time: "",
       topics: "",
+      totalStudents: 10,
+      revenue: 100,
     },
   });
 
@@ -181,6 +219,7 @@ const AdminBatches = () => {
       startDate: "",
       endDate: "",
       teacher: "",
+      teacherName: "", // Added field to store teacher name for display
       time: "",
       topics: "",
     },
@@ -213,26 +252,24 @@ const AdminBatches = () => {
         },
         body: JSON.stringify({
           batchName: data.batchName,
-          teacher: data.teacher,
+          teacher: data.teacher, // Now passing the teacher ID instead of name
           startDate: data.startDate,
           endDate: data.endDate,
           scheduleDays: selectedDays,
           sessionTime: data.time,
           sessionTopic: data.topics,
-          totalStudents: 0,
+          totalStudents: data.totalStudents || 10, // Use form value or default
+          revenue: data.revenue || 100, // Use form value or default
+          students: [], // Initialize with empty array
         }),
       });
-
       const resData = await response.json();
-
       if (!response.ok)
         throw new Error(resData.error || "Something went wrong");
-
       toast({
         title: "Batch Created",
         description: "New batch has been added successfully",
       });
-
       fetchBatches(); // Refresh batches data
       form.reset();
       setSelectedDays([]);
@@ -251,17 +288,18 @@ const AdminBatches = () => {
     if (batch) {
       setCurrentBatch(batch);
       // Format dates for the date input (YYYY-MM-DD)
-      const startDate = batch.startDate.split('T')[0];
-      const endDate = batch.endDate.split('T')[0];
-      
+      const startDate = batch.startDate.split("T")[0];
+      const endDate = batch.endDate.split("T")[0];
+
       editForm.reset({
         batchName: batch.batchName,
         startDate: startDate,
         endDate: endDate,
-        teacher: batch.teacher,
+        teacher: batch.teacher, // Using teacherId
+        teacherName: teacherMap[batch.teacher] || batch.teacher, // Display name
         time: batch.sessionTime,
-        topics: Array.isArray(batch.sessionTopic) 
-          ? batch.sessionTopic.join('\n') 
+        topics: Array.isArray(batch.sessionTopic)
+          ? batch.sessionTopic.join("\n")
           : batch.sessionTopic || "",
       });
       setSelectedDays(batch.scheduleDays);
@@ -271,23 +309,30 @@ const AdminBatches = () => {
 
   const handleUpdateBatch = async (data) => {
     if (!currentBatch) return;
-    
+
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/batches/${currentBatch._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          batchName: data.batchName,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          scheduleDays: selectedDays,
-          sessionTime: data.time,
-          sessionTopic: data.topics.split('\n').filter(topic => topic.trim()),
-        }),
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/batches/${currentBatch._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            batchName: data.batchName,
+            teacher: data.teacher, // Using teacherId
+            startDate: data.startDate,
+            endDate: data.endDate,
+            scheduleDays: selectedDays,
+            sessionTime: data.time,
+            sessionTopic: data.topics
+              .split("\n")
+              .filter((topic) => topic.trim()),
+            // We're not changing the teacher in the edit form
+          }),
+        }
+      );
 
       const resData = await response.json();
 
@@ -298,7 +343,7 @@ const AdminBatches = () => {
         title: "Batch Updated",
         description: "Batch has been successfully updated",
       });
-      
+
       fetchBatches(); // Refresh batches data
       setShowEditBatchDialog(false);
       editForm.reset();
@@ -322,7 +367,7 @@ const AdminBatches = () => {
 
   const handleDeleteConfirm = async () => {
     if (!currentBatch) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(
@@ -341,9 +386,11 @@ const AdminBatches = () => {
         title: "Batch Deleted",
         description: "The batch has been successfully deleted",
       });
-      
+
       // Remove the batch from local state
-      setBatchesData(batchesData.filter((batch) => batch._id !== currentBatch._id));
+      setBatchesData(
+        batchesData.filter((batch) => batch._id !== currentBatch._id)
+      );
       setShowDeleteDialog(false);
       setCurrentBatch(null);
     } catch (err) {
@@ -357,14 +404,16 @@ const AdminBatches = () => {
     }
   };
 
-  const batchesWithStatus = batchesData.map(batch => ({
+  const batchesWithStatus = batchesData.map((batch) => ({
     ...batch,
-    status: getBatchStatus(batch.startDate, batch.endDate)
+    status: getBatchStatus(batch.startDate, batch.endDate),
   }));
-  
+
   const filteredBatches = batchesWithStatus.filter(
     (batch) =>
-      (batch.batchName?.toLowerCase() || "").includes(searchTerm.toLowerCase()) &&
+      (batch.batchName?.toLowerCase() || "").includes(
+        searchTerm.toLowerCase()
+      ) &&
       (activeTab === "all" || batch.status === activeTab)
   );
 
@@ -452,7 +501,9 @@ const AdminBatches = () => {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <School className="h-4 w-4 text-muted-foreground" />
-                            <span>{batch.teacher}</span>
+                            <span>
+                              {teacherMap[batch.teacher] || batch.teacher}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -516,7 +567,7 @@ const AdminBatches = () => {
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Batch
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   className="flex items-center text-destructive"
                                   onClick={() => handleDeleteClick(batch)}
                                 >
@@ -546,7 +597,7 @@ const AdminBatches = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Add Batch Dialog - Kept as is */}
+      {/* Add Batch Dialog - Updated to use teacher ID */}
       <Dialog open={showAddBatchDialog} onOpenChange={setShowAddBatchDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -593,7 +644,7 @@ const AdminBatches = () => {
                         </FormControl>
                         <SelectContent>
                           {teachersData.map((teacher) => (
-                            <SelectItem key={teacher.id} value={teacher.name}>
+                            <SelectItem key={teacher._id} value={teacher._id}>
                               {teacher.name}
                             </SelectItem>
                           ))}
@@ -766,7 +817,19 @@ const AdminBatches = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Teacher</FormLabel>
-                      <Input value={field.value} readOnly />
+                      <FormControl>
+                        <select
+                          className="border border-input rounded-md px-3 py-2 w-full"
+                          {...field}
+                        >
+                          <option value="">Select a teacher</option>
+                          {teachersData.map((teacher) => (
+                            <option key={teacher._id} value={teacher._id}>
+                              {teacher.name}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -887,12 +950,13 @@ const AdminBatches = () => {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete the batch{" "}
-              <span className="font-semibold">{currentBatch?.batchName}</span>. This action cannot be undone.
+              <span className="font-semibold">{currentBatch?.batchName}</span>.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isLoading}

@@ -43,36 +43,6 @@ import {
 import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
-// Mock teacher data (would come from an API in a real application)
-// const teacherData = {
-//   id: 1,
-//   name: 'Jamie Smith',
-//   email: 'jamie.smith@example.com',
-//   phone: '+1 234-567-8901',
-//   specialization: 'Business Strategy',
-//   status: 'active',
-//   totalBatches: 2,
-//   currentBatches: 1,
-//   totalStudents: 31,
-//   totalEarnings: 1450,
-//   rating: 4.8,
-//   joiningDate: '2023-01-15',
-//   batches: [
-//     { id: 1, name: 'Business Bootcamp - Batch 1', students: 15, status: 'ongoing' },
-//     { id: 4, name: 'Business Bootcamp - Batch 0', students: 16, status: 'completed' }
-//   ],
-//   earnings: [
-//     { month: 'January', amount: 450 },
-//     { month: 'February', amount: 520 },
-//     { month: 'March', amount: 480 }
-//   ],
-//   students: [
-//     { id: 1, name: 'Alex Johnson', batch: 'Business Bootcamp - Batch 1', performance: 'Excellent' },
-//     { id: 2, name: 'Morgan Smith', batch: 'Business Bootcamp - Batch 1', performance: 'Good' },
-//     { id: 3, name: 'Jamie Lee', batch: 'Business Bootcamp - Batch 0', performance: 'Excellent' }
-//   ]
-// };
-
 const AdminTeacherDetails = () => {
   const navigate = useNavigate();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
