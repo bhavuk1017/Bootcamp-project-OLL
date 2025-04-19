@@ -3,104 +3,115 @@ import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
 import Batch from '../models/batch.model.js';
 
-export const getDashboardStats = async (req, res) => {
+// Student Dashboard Controller
+export const getStudentDashboard = async (req, res) => {
   try {
-    // Get counts from each collection
+    const studentId = req.user._id; // From auth middleware
+    const student = await Student.findById(studentId)
+      .populate('batches')
+      .populate('teachers');
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Calculate student's progress and stats
+    const totalBatches = student.batches.length;
+    const completedTasks = student.taskCompletion || 0;
+    const progress = Math.round((completedTasks / (totalBatches * 10)) * 100); // Assuming 10 tasks per batch
+
+    // Get student's rank
+    const allStudents = await Student.find({}, 'earning');
+    const sortedEarnings = allStudents.map(s => s.earning).sort((a, b) => b - a);
+    const rank = sortedEarnings.indexOf(student.earning) + 1;
+
+    const dashboardData = {
+      name: student.name,
+      business: student.business || "Not set",
+      earnings: student.earning || 0,
+      sales: student.sales || 0,
+      progress: progress,
+      badges: Math.floor(progress / 20), // One badge per 20% progress
+      rank: rank,
+      tasks: [
+        { id: 1, title: 'Complete business plan', completed: progress >= 20 },
+        { id: 2, title: 'Create product photos', completed: progress >= 40 },
+        { id: 3, title: 'Set up pricing strategy', completed: progress >= 60 },
+        { id: 4, title: 'Make first sale', completed: student.sales > 0 }
+      ]
+    };
+
+    res.json(dashboardData);
+  } catch (error) {
+    console.error('Error fetching student dashboard:', error);
+    res.status(500).json({ message: 'Error fetching dashboard data' });
+  }
+};
+
+// Teacher/Mentor Dashboard Controller
+export const getMentorDashboard = async (req, res) => {
+  try {
+    const teacherId = req.user._id;
+    const teacher = await Teacher.findById(teacherId)
+      .populate('batches')
+      .populate('students');
+
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher not found' });
+    }
+
+    // Calculate pending approvals (tasks needing review)
+    const pendingApprovals = await Batch.aggregate([
+      { $match: { teacher: teacherId } },
+      { $unwind: '$tasks' },
+      { $match: { 'tasks.status': 'pending_review' } },
+      { $count: 'total' }
+    ]);
+
+    // Get teacher's rank based on earnings
+    const allTeachers = await Teacher.find({}, 'totalEarnings');
+    const sortedEarnings = allTeachers.map(t => t.totalEarnings).sort((a, b) => b - a);
+    const rank = sortedEarnings.indexOf(teacher.totalEarnings) + 1;
+
+    const dashboardData = {
+      name: teacher.name,
+      students: teacher.students.length,
+      pendingApprovals: pendingApprovals[0]?.total || 0,
+      totalEarnings: teacher.totalEarnings || 0,
+      rank: rank
+    };
+
+    res.json(dashboardData);
+  } catch (error) {
+    console.error('Error fetching mentor dashboard:', error);
+    res.status(500).json({ message: 'Error fetching dashboard data' });
+  }
+};
+
+// Admin Dashboard Controller
+export const getAdminDashboard = async (req, res) => {
+  try {
+    // Get counts and stats
     const totalStudents = await Student.countDocuments();
-    const totalTeachers = await Teacher.countDocuments();
-    const totalBatches = await Batch.countDocuments();
+    const totalMentors = await Teacher.countDocuments();
     
-    // Calculate total revenue (sum of all batch revenues)
+    // Calculate total revenue
     const batches = await Batch.find({}, 'revenue');
     const totalRevenue = batches.reduce((sum, batch) => sum + (batch.revenue || 0), 0);
     
-    // Get monthly revenue data for the chart
-    const currentYear = new Date().getFullYear();
-    const monthlyRevenueData = await Batch.aggregate([
-      {
-        $match: {
-          startDate: { 
-            $gte: new Date(`${currentYear}-01-01`), 
-            $lte: new Date(`${currentYear}-12-31`) 
-          }
-        }
-      },
-      {
-        $group: {
-          _id: { $month: "$startDate" },
-          value: { $sum: "$revenue" }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
-    
-    // Fill in missing months with zero values
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const revenueData = months.map((month, index) => {
-      const foundMonth = monthlyRevenueData.find(item => item._id === index + 1);
-      return {
-        month,
-        value: foundMonth ? foundMonth.value : 0
-      };
-    });
-    
-    // Get monthly enrollment data for the chart
-    const monthlyEnrollmentData = await Student.aggregate([
-      {
-        $match: {
-          createdAt: { 
-            $gte: new Date(`${currentYear}-01-01`), 
-            $lte: new Date(`${currentYear}-12-31`) 
-          }
-        }
-      },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          value: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
-    
-    // Fill in missing months with zero values
-    const enrollmentData = months.map((month, index) => {
-      const foundMonth = monthlyEnrollmentData.find(item => item._id === index + 1);
-      return {
-        month,
-        value: foundMonth ? foundMonth.value : 0
-      };
-    });
-    
-    // Get batch details for the revenue distribution table
-    const batchesMockData = await Batch.find()
-      .select('batchName revenue')
-      .lean();
-      
-    // Calculate students per batch and revenue splits
-    for (let batch of batchesMockData) {
-      batch.students = batch.totalStudents || 0;
-      batch.teacherEarning = Math.round(batch.revenue * 0.2); // 20% for teacher
-      batch.ollShare = Math.round(batch.revenue * 0.3); // 30% for OLL
-      // Student earnings are calculated in the frontend
-    }
+    // Get pending approvals (new registrations, etc.)
+    const pendingApprovals = await Student.countDocuments({ status: 'pending' });
 
-    res.status(200).json({
+    const dashboardData = {
       totalStudents,
-      totalTeachers,
-      totalBatches,
+      totalMentors,
       totalRevenue,
-      revenueData,
-      enrollmentData,
-      batchesMockData
-    });
-    
+      pendingApprovals
+    };
+
+    res.json(dashboardData);
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    res.status(500).json({ message: 'Error fetching dashboard stats' });
+    console.error('Error fetching admin dashboard:', error);
+    res.status(500).json({ message: 'Error fetching dashboard data' });
   }
 };

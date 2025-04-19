@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Lock, School, Upload, X } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { User, Mail, Phone, Lock, School } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { register } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   
   // Register form state
   const [name, setName] = useState("");
@@ -22,74 +23,93 @@ const Register = () => {
   const [school, setSchool] = useState("");
   const [userType, setUserType] = useState<"student" | "mentor" | "admin">("student");
   
-  // Bulk upload
-  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
-  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
-  
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    try {
+      // Basic validation
+      if (!name || !email || !password || !confirmPassword || !phone) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        toast({
+          title: "Error",
+          description: "Passwords do not match",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid email address",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Phone validation (basic)
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(phone.replace(/[^0-9]/g, ''))) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid 10-digit phone number",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // School validation for students
+      if (userType === "student" && !school) {
+        toast({
+          title: "Error",
+          description: "School name is required for students",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Call register from auth context
+      await register({
+        name,
+        email,
+        password,
+        phone,
+        role: userType,
+        school: userType === 'student' ? school : undefined,
+      });
+      
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created.",
+      });
+
+      // Navigation will be handled by the auth context after successful registration
+
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: error.message || "Failed to register",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // In a real app, this would be an API call to register the user
-    // For demo purposes, we'll just navigate based on user type
-    
-    if (userType === "student") {
-      navigate("/student/dashboard");
-    } else if (userType === "mentor") {
-      navigate("/mentor/dashboard");
-    } else if (userType === "admin") {
-      navigate("/admin/dashboard");
-    }
-    
-    toast({
-      title: "Registration successful!",
-      description: "Your account has been created.",
-    });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setBulkUploadFile(e.target.files[0]);
-    }
-  };
-
-  const handleBulkUpload = () => {
-    if (!bulkUploadFile) {
-      toast({
-        title: "Error",
-        description: "Please select a file to upload",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // In a real app, this would process the CSV/Excel file
-    toast({
-      title: "Bulk upload successful",
-      description: "Users have been created successfully",
-    });
-
-    setShowBulkUploadDialog(false);
-    setBulkUploadFile(null);
-    navigate("/admin/students");
   };
   
   return (
@@ -115,6 +135,8 @@ const Register = () => {
                   className="pl-10"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  disabled={isLoading}
+                  required
                 />
               </div>
             </div>
@@ -130,6 +152,8 @@ const Register = () => {
                   className="pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  required
                 />
               </div>
             </div>
@@ -145,6 +169,8 @@ const Register = () => {
                   className="pl-10"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={isLoading}
+                  required
                 />
               </div>
             </div>
@@ -160,6 +186,8 @@ const Register = () => {
                     className="pl-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -174,6 +202,8 @@ const Register = () => {
                     className="pl-10"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -190,18 +220,21 @@ const Register = () => {
                   className="pl-10"
                   value={school}
                   onChange={(e) => setSchool(e.target.value)}
+                  disabled={isLoading || userType !== 'student'}
+                  required={userType === 'student'}
                 />
               </div>
             </div>
             
             <div className="space-y-2">
               <Label>Account Type</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-4">
                 <Button 
                   type="button" 
                   variant={userType === "student" ? "default" : "outline"}
                   onClick={() => setUserType("student")}
                   className="flex-1"
+                  disabled={isLoading}
                 >
                   Student
                 </Button>
@@ -210,37 +243,17 @@ const Register = () => {
                   variant={userType === "mentor" ? "default" : "outline"}
                   onClick={() => setUserType("mentor")}
                   className="flex-1"
+                  disabled={isLoading}
                 >
                   Mentor
-                </Button>
-                <Button 
-                  type="button" 
-                  variant={userType === "admin" ? "default" : "outline"}
-                  onClick={() => setUserType("admin")}
-                  className="flex-1"
-                >
-                  Admin
                 </Button>
               </div>
             </div>
             
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
-          
-          {/* Admin bulk upload option */}
-          <div className="mt-6 pt-6 border-t text-center">
-            <p className="text-sm text-muted-foreground mb-3">Admin option</p>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setShowBulkUploadDialog(true)}
-            >
-              <Upload size={16} className="mr-2" />
-              Bulk Add Users
-            </Button>
-          </div>
         </CardContent>
         
         <CardFooter className="flex flex-col space-y-2 border-t p-6 text-center text-sm text-muted-foreground">
@@ -257,96 +270,6 @@ const Register = () => {
           </div>
         </CardFooter>
       </Card>
-      
-      {/* Bulk Upload Dialog */}
-      <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Bulk Add Users</DialogTitle>
-            <DialogDescription>
-              Upload a CSV or Excel file with user information
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center">
-              <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground mb-1">
-                Drag and drop your file here or click to browse
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Accepted file types: CSV, XLSX (max 5MB)
-              </p>
-              <Input 
-                id="file-upload" 
-                type="file" 
-                accept=".csv,.xlsx" 
-                className="hidden" 
-                onChange={handleFileChange} 
-              />
-              <Button 
-                variant="outline" 
-                className="mt-4" 
-                onClick={() => document.getElementById('file-upload')?.click()}
-              >
-                Select File
-              </Button>
-            </div>
-            
-            {bulkUploadFile && (
-              <div className="mt-4 p-3 bg-muted/30 rounded-md flex items-center justify-between">
-                <div className="text-sm">
-                  <span className="font-medium">Selected file:</span> {bulkUploadFile.name}
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8"
-                  onClick={() => setBulkUploadFile(null)}
-                >
-                  <X size={16} />
-                </Button>
-              </div>
-            )}
-            
-            <div className="mt-4 text-sm">
-              <p className="font-medium">File format must include:</p>
-              <ul className="list-disc pl-5 space-y-1 mt-2 text-muted-foreground">
-                <li>Full Name</li>
-                <li>Email Address</li>
-                <li>Phone Number</li>
-                <li>Password</li>
-                <li>School Name (for students)</li>
-                <li>User Type (student, mentor, admin)</li>
-              </ul>
-            </div>
-            
-            <div className="mt-4">
-              <a 
-                href="#" 
-                className="text-sm text-blue-600 hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  // In a real app, this would download a template
-                  toast({
-                    title: "Template downloaded",
-                    description: "CSV template has been downloaded"
-                  });
-                }}
-              >
-                Download CSV template with required columns
-              </a>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkUploadDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleBulkUpload} disabled={!bulkUploadFile}>
-              Upload and Create Users
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

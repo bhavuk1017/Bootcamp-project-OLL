@@ -7,12 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Mail, User, School } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { login, register } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [isLoading, setIsLoading] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -23,6 +26,7 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [school, setSchool] = useState("");
   const [userType, setUserType] = useState<"student" | "mentor" | "admin">("student");
   
@@ -35,76 +39,91 @@ const Login = () => {
     }
   }, [location]);
   
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!loginEmail || !loginPassword) {
+    try {
+      // Basic validation
+      if (!loginEmail || !loginPassword) {
+        toast({
+          title: "Error",
+          description: "Please enter both email and password",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Calling login function with:', loginEmail);
+      // Call login from auth context
+      const userData = await login(loginEmail, loginPassword);
+      console.log('Login successful, user data:', userData);
+      
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in."
+      });
+
+    } catch (error: any) {
+      console.error('Login error in component:', error);
       toast({
         title: "Error",
-        description: "Please enter both email and password",
+        description: error.message || "Failed to login",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    // In a real app, this would be an API call to authenticate
-    // For demo purposes, we'll just navigate based on user type
-    
-    if (loginEmail.includes("student")) {
-      navigate("/student/dashboard");
-    } else if (loginEmail.includes("mentor") || loginEmail.includes("teacher")) {
-      navigate("/mentor/dashboard");
-    } else if (loginEmail.includes("admin")) {
-      navigate("/admin/dashboard");
-    } else {
-      // Default to student dashboard
-      navigate("/student/dashboard");
-    }
-    
-    toast({
-      title: "Welcome back!",
-      description: "You have successfully logged in."
-    });
   };
   
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!name || !email || !password || !confirmPassword) {
+    try {
+      // Basic validation
+      if (!name || !email || !password || !confirmPassword || !phone) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        toast({
+          title: "Error",
+          description: "Passwords do not match",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Call register from auth context
+      await register({
+        name,
+        email,
+        password,
+        phone,
+        role: userType,
+        school: userType === 'student' ? school : undefined,
+      });
+      
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created.",
+      });
+
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: error.message || "Failed to register",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // In a real app, this would be an API call to register the user
-    // For demo purposes, we'll just navigate based on user type
-    
-    if (userType === "student") {
-      navigate("/student/dashboard");
-    } else if (userType === "mentor") {
-      navigate("/mentor/dashboard");
-    } else if (userType === "admin") {
-      navigate("/admin/dashboard");
-    }
-    
-    toast({
-      title: "Registration successful!",
-      description: "Your account has been created.",
-    });
   };
   
   return (
@@ -146,6 +165,7 @@ const Login = () => {
                       className="pl-10"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -165,12 +185,13 @@ const Login = () => {
                       className="pl-10"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full">
-                  Login
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </TabsContent>
@@ -188,6 +209,7 @@ const Login = () => {
                       className="pl-10"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -203,6 +225,23 @@ const Login = () => {
                       className="pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      id="phone"
+                      type="tel"
+                      placeholder="(123) 456-7890"
+                      className="pl-10"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -218,6 +257,7 @@ const Login = () => {
                         className="pl-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                   </div>
@@ -232,6 +272,7 @@ const Login = () => {
                         className="pl-10"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                   </div>
@@ -248,6 +289,7 @@ const Login = () => {
                       className="pl-10"
                       value={school}
                       onChange={(e) => setSchool(e.target.value)}
+                      disabled={isLoading || userType !== 'student'}
                     />
                   </div>
                 </div>
@@ -260,6 +302,7 @@ const Login = () => {
                       variant={userType === "student" ? "default" : "outline"}
                       onClick={() => setUserType("student")}
                       className="flex-1"
+                      disabled={isLoading}
                     >
                       Student
                     </Button>
@@ -268,14 +311,15 @@ const Login = () => {
                       variant={userType === "mentor" ? "default" : "outline"}
                       onClick={() => setUserType("mentor")}
                       className="flex-1"
+                      disabled={isLoading}
                     >
                       Mentor
                     </Button>
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full">
-                  Create Account
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
             </TabsContent>

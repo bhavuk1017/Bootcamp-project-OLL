@@ -1,67 +1,120 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Rocket, DollarSign, Trophy, BarChart3, Users, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/ui-custom/UserAvatar';
 import ProgressCard from '@/components/ui-custom/ProgressCard';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
-// This would come from your auth context in a real app
-const role = 'student'; // or 'mentor' or 'admin'
+interface StudentDashboardData {
+  name: string;
+  business: string;
+  earnings: number;
+  sales: number;
+  progress: number;
+  badges: number;
+  rank: number;
+  tasks: Array<{
+    id: number;
+    title: string;
+    completed: boolean;
+  }>;
+}
 
-// Mock data
-const studentData = {
-  name: 'Alex Johnson',
-  business: 'Eco Crafts',
-  earnings: 325,
-  sales: 17,
-  progress: 65,
-  badges: 4,
-  rank: 7,
-  tasks: [
-    { id: 1, title: 'Complete business plan', completed: true },
-    { id: 2, title: 'Create product photos', completed: true },
-    { id: 3, title: 'Set up pricing strategy', completed: false },
-    { id: 4, title: 'Make first sale', completed: false }
-  ]
-};
+interface MentorDashboardData {
+  name: string;
+  students: number;
+  pendingApprovals: number;
+  totalEarnings: number;
+  rank: number;
+}
 
-const mentorData = {
-  name: 'Jamie Smith',
-  students: 8,
-  pendingApprovals: 3,
-  totalEarnings: 1280,
-  rank: 2
-};
+interface AdminDashboardData {
+  totalStudents: number;
+  totalMentors: number;
+  totalRevenue: number;
+  pendingApprovals: number;
+}
 
-const adminData = {
-  totalStudents: 156,
-  totalMentors: 12,
-  totalRevenue: 24680,
-  pendingApprovals: 7
-};
-
-// Dashboard component that renders based on role
 const Dashboard = () => {
-  // Render different dashboards based on role
-  if (role === 'student') {
-    return <StudentDashboard data={studentData} />;
-  } else if (role === 'mentor') {
-    return <MentorDashboard data={mentorData} />;
-  } else {
-    return <AdminDashboard data={adminData} />;
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/dashboard/${user.role.toLowerCase()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Failed to load dashboard</h2>
+          <Button onClick={fetchDashboardData} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render different dashboards based on user role
+  switch (user.role) {
+    case 'Student':
+      return <StudentDashboard data={dashboardData} />;
+    case 'Teacher':
+      return <MentorDashboard data={dashboardData} />;
+    case 'Admin':
+      return <AdminDashboard data={dashboardData} />;
+    default:
+      return <div>Invalid role</div>;
   }
 };
 
-// Student Dashboard
-const StudentDashboard = ({ data }: { data: typeof studentData }) => {
+const StudentDashboard = ({ data }: { data: StudentDashboardData }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Student Dashboard</h1>
         <Button asChild>
-          <Link to="/my-business">
+          <Link to="/student/business">
             <Rocket className="mr-2" size={16} />
             My Business
           </Link>
@@ -175,14 +228,13 @@ const StudentDashboard = ({ data }: { data: typeof studentData }) => {
   );
 };
 
-// Mentor Dashboard
-const MentorDashboard = ({ data }: { data: typeof mentorData }) => {
+const MentorDashboard = ({ data }: { data: MentorDashboardData }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Mentor Dashboard</h1>
         <Button asChild>
-          <Link to="/students">
+          <Link to="/mentor/students">
             <Users className="mr-2" size={16} />
             View Students
           </Link>
@@ -200,7 +252,7 @@ const MentorDashboard = ({ data }: { data: typeof mentorData }) => {
             </div>
             {data.pendingApprovals > 0 && (
               <Button className="md:ml-auto" variant="outline" asChild>
-                <Link to="/approvals">Review Approvals</Link>
+                <Link to="/mentor/approvals">Review Approvals</Link>
               </Button>
             )}
           </div>
@@ -229,7 +281,7 @@ const MentorDashboard = ({ data }: { data: typeof mentorData }) => {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leaderboard Rank</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Mentor Rank</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">#{data.rank}</div>
@@ -297,8 +349,7 @@ const MentorDashboard = ({ data }: { data: typeof mentorData }) => {
   );
 };
 
-// Admin Dashboard
-const AdminDashboard = ({ data }: { data: typeof adminData }) => {
+const AdminDashboard = ({ data }: { data: AdminDashboardData }) => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Admin Dashboard</h1>
