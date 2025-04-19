@@ -1,106 +1,113 @@
-// server/controllers/dashboardController.js
+import Batch from '../models/batch.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
-import Batch from '../models/batch.model.js';
 
+// API endpoint to get dashboard statistics
 export const getDashboardStats = async (req, res) => {
   try {
-    // Get counts from each collection
+    // Get total counts
     const totalStudents = await Student.countDocuments();
     const totalTeachers = await Teacher.countDocuments();
     const totalBatches = await Batch.countDocuments();
     
-    // Calculate total revenue (sum of all batch revenues)
-    const batches = await Batch.find({}, 'revenue');
+    // Calculate total revenue
+    const batches = await Batch.find().populate('students');
     const totalRevenue = batches.reduce((sum, batch) => sum + (batch.revenue || 0), 0);
     
-    // Get monthly revenue data for the chart
-    const currentYear = new Date().getFullYear();
-    const monthlyRevenueData = await Batch.aggregate([
-      {
-        $match: {
-          startDate: { 
-            $gte: new Date(`${currentYear}-01-01`), 
-            $lte: new Date(`${currentYear}-12-31`) 
-          }
-        }
-      },
-      {
-        $group: {
-          _id: { $month: "$startDate" },
-          value: { $sum: "$revenue" }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
+    // Get monthly revenue data (for the calendar year)
+    const monthlyRevenue = await getMonthlyRevenue();
     
-    // Fill in missing months with zero values
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const revenueData = months.map((month, index) => {
-      const foundMonth = monthlyRevenueData.find(item => item._id === index + 1);
-      return {
-        month,
-        value: foundMonth ? foundMonth.value : 0
-      };
-    });
+    // Get monthly enrollment data (for the calendar year)
+    const monthlyEnrollment = await getMonthlyEnrollment();
     
-    // Get monthly enrollment data for the chart
-    const monthlyEnrollmentData = await Student.aggregate([
-      {
-        $match: {
-          createdAt: { 
-            $gte: new Date(`${currentYear}-01-01`), 
-            $lte: new Date(`${currentYear}-12-31`) 
-          }
-        }
-      },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          value: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
+    // Get all batches with complete data for the table
+    const batchesMockData = await getBatchesData();
     
-    // Fill in missing months with zero values
-    const enrollmentData = months.map((month, index) => {
-      const foundMonth = monthlyEnrollmentData.find(item => item._id === index + 1);
-      return {
-        month,
-        value: foundMonth ? foundMonth.value : 0
-      };
-    });
-    
-    // Get batch details for the revenue distribution table
-    const batchesMockData = await Batch.find()
-      .select('batchName revenue')
-      .lean();
-      
-    // Calculate students per batch and revenue splits
-    for (let batch of batchesMockData) {
-      batch.students = batch.totalStudents || 0;
-      batch.teacherEarning = Math.round(batch.revenue * 0.2); // 20% for teacher
-      batch.ollShare = Math.round(batch.revenue * 0.3); // 30% for OLL
-      // Student earnings are calculated in the frontend
-    }
-
     res.status(200).json({
       totalStudents,
       totalTeachers,
-      totalBatches,
       totalRevenue,
-      revenueData,
-      enrollmentData,
-      batchesMockData
+      totalBatches,
+      revenueData: monthlyRevenue,
+      enrollmentData: monthlyEnrollment,
+      batchesMockData // Changed from batchesData to match frontend expected prop
     });
     
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    res.status(500).json({ message: 'Error fetching dashboard stats' });
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ message: 'Error fetching dashboard statistics' });
   }
+};
+
+// Helper function to get monthly revenue data - Jan to Dec of current year
+const getMonthlyRevenue = async () => {
+  const currentYear = new Date().getFullYear();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const data = [];
+  
+  // For each month, get the sum of batch revenue
+  for (let i = 0; i < 12; i++) {
+    const startOfMonth = new Date(currentYear, i, 1);
+    const endOfMonth = new Date(currentYear, i + 1, 0);
+    
+    const monthBatches = await Batch.find({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+    
+    const monthRevenue = monthBatches.reduce((sum, batch) => sum + (batch.revenue || 0), 0);
+    
+    data.push({
+      month: months[i],
+      value: monthRevenue
+    });
+  }
+  
+  return data;
+};
+
+// Helper function to get monthly enrollment data - Jan to Dec of current year
+const getMonthlyEnrollment = async () => {
+  const currentYear = new Date().getFullYear();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const data = [];
+  
+  // For each month, count students enrolled
+  for (let i = 0; i < 12; i++) {
+    const startOfMonth = new Date(currentYear, i, 1);
+    const endOfMonth = new Date(currentYear, i + 1, 0);
+    
+    const studentsCount = await Student.countDocuments({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+    
+    data.push({
+      month: months[i],
+      value: studentsCount // Whole number of students
+    });
+  }
+  
+  return data;
+};
+
+// Helper function to get batches data for the table
+const getBatchesData = async () => {
+  const batches = await Batch.find()
+    .populate('teacher', 'name')
+    .populate('students');
+  
+  return batches.map(batch => {
+    const totalRevenue = batch.revenue || 0;
+    const studentCount = batch.students.length; // Count actual students in the array
+    
+    return {
+      _id: batch._id, // Fixed the typo in _id
+      batchName: batch.batchName || `Batch ${batch._id.toString().slice(-4)}`,
+      students: studentCount,
+      revenue: totalRevenue,
+      teacherEarning: Math.round(totalRevenue * 0.2), // 20% for teacher
+      ollShare: Math.round(totalRevenue * 0.3), // 30% for OLL
+      // Student earnings calculated as remaining 50%
+      studentEarning: Math.round(totalRevenue * 0.5)
+    };
+  });
 };

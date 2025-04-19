@@ -16,24 +16,85 @@ const MentorDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/teacher/dashboard');
+        
+        // For development only - until auth is implemented
+        // You can add a mock axios interceptor here to add the auth token once implemented
+        /*
+        axios.interceptors.request.use(config => {
+          const token = localStorage.getItem('token');
+          if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+          }
+          return config;
+        });
+        */
+        
+        const response = await axios.get('http://localhost:5000/api/teachers/dashboard');
         setDashboardData(response.data);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data. Please try again later.');
         setLoading(false);
+        
+        // For development only - fallback to mock data if the API fails
+        // Remove this in production
+        setMockDataForDevelopment();
       }
     };
 
     fetchDashboardData();
   }, []);
 
+  // For development only - mock data function
+  const setMockDataForDevelopment = () => {
+    const mockData = {
+      totalEarnings: "1200.00",
+      totalStudents: 24,
+      totalBatches: 3,
+      recentBatches: [
+        {
+          id: "1",
+          name: "Advanced JavaScript 2025",
+          status: "ongoing",
+          students: 8,
+          earnings: "320.00"
+        },
+        {
+          id: "2",
+          name: "React Fundamentals",
+          status: "upcoming",
+          students: 10,
+          earnings: "400.00"
+        },
+        {
+          id: "3",
+          name: "Node.js Backend",
+          status: "completed",
+          students: 6,
+          earnings: "240.00"
+        }
+      ],
+      batches: [],
+      students: [],
+      nextSession: {
+        batchId: "1",
+        batch: "Advanced JavaScript 2025",
+        date: new Date(new Date().getTime() + 86400000), // tomorrow
+        topic: "ES6 Features and Modern JavaScript"
+      }
+    };
+    
+    setDashboardData(mockData);
+    setLoading(false);
+    setError(null);
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading dashboard data...</div>;
   }
 
-  if (error) {
+  if (error && !dashboardData) {
     return <div className="text-red-500 text-center p-4">{error}</div>;
   }
 
@@ -65,12 +126,24 @@ const MentorDashboard = () => {
         <h1 className="text-2xl font-bold">Mentor Dashboard</h1>
       </div>
 
+      {error && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                {error} Using demo data for preview.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Earnings</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <DollarSign className="mr-2 h-6 w-6 text-success" />
+              <DollarSign className="mr-2 h-6 w-6 text-green-500" />
               ${dashboardData.totalEarnings}
             </CardTitle>
           </CardHeader>
@@ -85,13 +158,13 @@ const MentorDashboard = () => {
           <CardHeader className="pb-2">
             <CardDescription>Students</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <Users className="mr-2 h-6 w-6 text-primary" />
-              {dashboardData.totalStudents}
+              <Users className="mr-2 h-6 w-6 text-blue-500" />
+              {dashboardData.students.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Across {dashboardData.totalBatches} batches
+              Across {dashboardData.batches.length} batches
             </p>
           </CardContent>
         </Card>
@@ -100,12 +173,12 @@ const MentorDashboard = () => {
           <CardHeader className="pb-2">
             <CardDescription>Batches</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <BarChart3 className="mr-2 h-6 w-6 text-accent" />
-              {dashboardData.totalBatches}
+              <BarChart3 className="mr-2 h-6 w-6 text-purple-500" />
+              {dashboardData.batches.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Button removed as requested */}
+            {/* No button as requested */}
           </CardContent>
         </Card>
       </div>
