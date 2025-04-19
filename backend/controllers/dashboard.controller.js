@@ -1,7 +1,6 @@
-// server/controllers/dashboardController.js
+import Batch from '../models/batch.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
-import Batch from '../models/batch.model.js';
 
 // Student Dashboard Controller
 export const getStudentDashboard = async (req, res) => {

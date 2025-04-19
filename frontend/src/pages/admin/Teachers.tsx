@@ -75,6 +75,8 @@ const AdminTeachers = () => {
       currentBatches: 1,
       totalStudents: 31,
       totalEarnings: 1450,
+      batches: [],
+      students: [],
       rating: 4.8,
       joiningDate: '2023-01-15'
     },
@@ -342,15 +344,15 @@ const AdminTeachers = () => {
                       <div className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <span className="font-medium">{teacher.currentBatches || 0}</span>
-                          <span className="text-muted-foreground"> / {teacher.totalBatches || 0}</span>
+                          <span className="font-medium">{teacher.batches.length || 0}</span>
+                          <span className="text-muted-foreground"> / {teacher.batches.length || 0}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span>{teacher.totalStudents || 0}</span>
+                        <span>{teacher.batches.length || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -363,7 +365,7 @@ const AdminTeachers = () => {
                       {teacher.rating > 0 ? (
                         <div className="flex items-center">
                           <Star className="h-4 w-4 mr-1 text-yellow-500 fill-yellow-500" />
-                          <span>{teacher.rating}</span>
+                          <span>{teacher.rating || 0}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">N/A</span>

@@ -1,8 +1,8 @@
 // backend/routes/batchRoutes.js
-import express from 'express';
-import Batch from '../models/batch.model.js';
-import Teacher from '../models/teacher.model.js';
-import Student from '../models/student.model.js';
+import express from "express";
+import Batch from "../models/batch.model.js";
+import Teacher from "../models/teacher.model.js";
+import Student from "../models/student.model.js";
 // import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -21,11 +21,13 @@ router.post("/", async (req, res) => {
     } = req.body;
 
     if (!batchName || !teacher) {
-      return res.status(400).json({ error: "Batch name and teacher are required" });
+      return res
+        .status(400)
+        .json({ error: "Batch name and teacher are required" });
     }
 
     const formattedSessionTopic = Array.isArray(sessionTopic)
-      ? sessionTopic.join(', ')
+      ? sessionTopic.join(", ")
       : sessionTopic;
 
     // Step 1: Create batch
@@ -50,7 +52,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({
       message: "Batch created successfully and assigned to teacher",
-      batch: savedBatch
+      batch: savedBatch,
     });
   } catch (err) {
     console.error("Failed to create batch:", err);
@@ -58,8 +60,10 @@ router.post("/", async (req, res) => {
   }
 });
 
+// In your backend API route for fetching batches
+
 // Get all batches
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const batches = await Batch.find();
     res.status(200).json(batches);
@@ -70,7 +74,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get a single batch by ID
-router.get('/:id', async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const batch = await Batch.findById(req.params.id);
 
@@ -99,7 +103,7 @@ router.put("/:id", async (req, res) => {
     } = req.body;
 
     const formattedSessionTopic = Array.isArray(sessionTopic)
-      ? sessionTopic.join(', ')
+      ? sessionTopic.join(", ")
       : sessionTopic;
 
     // Step 1: Get the existing batch
@@ -108,12 +112,14 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Batch not found" });
     }
 
-    const oldTeacherId = existingBatch.teacher.toString();
+    const oldTeacherId = existingBatch.teacher?.toString();
     const newTeacherId = teacher;
+    const batchId = req.params.id;
+    const studentIds = existingBatch.students;
 
     // Step 2: Update batch data
     const updatedBatch = await Batch.findByIdAndUpdate(
-      req.params.id,
+      batchId,
       {
         batchName,
         teacher,
@@ -127,42 +133,60 @@ router.put("/:id", async (req, res) => {
     );
 
     // Step 3: If teacher changed
-    if (oldTeacherId !== newTeacherId) {
-      // Remove batch and its students from old teacher
+    if (oldTeacherId && oldTeacherId !== newTeacherId) {
+      // Remove batch and students from old teacher
       await Teacher.findByIdAndUpdate(oldTeacherId, {
         $pull: {
-          batches: updatedBatch._id,
-          students: { $in: existingBatch.students }
-        }
+          batches: batchId,
+          students: { $in: studentIds },
+        },
       });
 
-      // Add batch and its students to new teacher
+      // Add batch and students to new teacher
       await Teacher.findByIdAndUpdate(newTeacherId, {
         $addToSet: {
-          batches: updatedBatch._id,
-          students: { $each: updatedBatch.students }
-        }
+          batches: batchId,
+          students: { $each: studentIds },
+        },
       });
+
+      // Update each student:
+      // First pull oldTeacherId
+      await Student.updateMany(
+        { _id: { $in: studentIds } },
+        { $pull: { teachers: oldTeacherId } }
+      );
+
+      // Then add newTeacherId
+      await Student.updateMany(
+        { _id: { $in: studentIds } },
+        { $addToSet: { teachers: newTeacherId } }
+      );
     } else {
-      // Teacher didn’t change, ensure students are synced
+      // If teacher didn't change, ensure students still have the teacher
       await Teacher.findByIdAndUpdate(oldTeacherId, {
         $addToSet: {
-          students: { $each: updatedBatch.students }
-        }
+          students: { $each: studentIds },
+        },
       });
+
+      await Student.updateMany(
+        { _id: { $in: studentIds } },
+        {
+          $addToSet: { teachers: oldTeacherId },
+        }
+      );
     }
 
     res.status(200).json({
       message: "Batch updated successfully",
-      batch: updatedBatch
+      batch: updatedBatch,
     });
   } catch (error) {
     console.error("Failed to update batch:", error);
     res.status(500).json({ error: "Failed to update batch" });
   }
 });
-
-
 
 // Delete a batch
 // router.delete("/:id", async (req, res) => {
@@ -232,17 +256,14 @@ router.delete("/:id", async (req, res) => {
 
     // 2. Remove batch and teacher reference from students
     const studentPullQuery = {
-      batches: batchId
+      batches: batchId,
     };
 
     if (teacherOfBatch) {
       studentPullQuery.teachers = teacherOfBatch;
     }
 
-    await Student.updateMany(
-      { batches: batchId },
-      { $pull: studentPullQuery }
-    );
+    await Student.updateMany({ batches: batchId }, { $pull: studentPullQuery });
 
     // 3. Remove batch reference from teacher
     await Teacher.updateOne(
@@ -250,8 +271,8 @@ router.delete("/:id", async (req, res) => {
       {
         $pull: {
           batches: batchId,
-          students: { $in: studentsInBatch } // <-- removing students of the deleted batch
-        }
+          students: { $in: studentsInBatch }, // <-- removing students of the deleted batch
+        },
       }
     );
 
@@ -259,40 +280,33 @@ router.delete("/:id", async (req, res) => {
       message: "Batch deleted successfully and all references cleaned",
       batch: deletedBatch,
     });
-
   } catch (error) {
     console.error("Failed to delete batch:", error);
     res.status(500).json({ error: "Failed to delete batch" });
   }
 });
 
+// Get batches by teacher ID
+router.get('/teacher/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = '680289d9994a95276bcd8b79'; // req.params.teacherId; // Assuming you get this from the request params
 
+    // Check if the authenticated user is allowed to access this teacher's batches
+    // if (req.user._id !== teacherId && req.user.role !== 'admin') {
+    //   return res.status(403).json({ message: 'Access denied' });
+    // }
 
+    // Find all batches where the teacher field matches teacherId
+    // Populate the students field to get student details
+    const batches = await Batch.find({ teacher: teacherId })
+      .populate('students', 'firstName lastName email')
+      .sort({ startDate: -1 });
 
-// // Get batches by teacher ID
-// router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
-//   try {
-//     const { teacherId } = req.params;
-    
-//     // Check if the authenticated user is allowed to access this teacher's batches
-//     if (req.user._id !== teacherId && req.user.role !== 'admin') {
-//       return res.status(403).json({ message: 'Access denied' });
-//     }
-    
-//     // Find all batches where the teacher field matches teacherId
-//     // Populate the students field to get student details
-//     const batches = await Batch.find({ teacher: teacherId })
-//       .populate('students', 'firstName lastName email')
-//       .sort({ startDate: -1 });
-    
-//     res.status(200).json(batches);
-//   } catch (error) {
-//     console.error('Error fetching teacher batches:', error);
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// });
-
-
-
+    res.status(200).json(batches);
+  } catch (error) {
+    console.error('Error fetching teacher batches:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 export default router;

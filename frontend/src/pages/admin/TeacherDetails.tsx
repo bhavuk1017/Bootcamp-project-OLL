@@ -23,29 +23,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import UserAvatar from "@/components/ui-custom/UserAvatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
 const AdminTeacherDetails = () => {
   const navigate = useNavigate();
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { teacherId } = useParams();
   const [teacherData, setTeacherData] = useState({
         id: 1,
@@ -54,72 +35,60 @@ const AdminTeacherDetails = () => {
         phone: '+1 234-567-8901',
         specialization: 'Business Strategy',
         status: 'active',
+        batches: [],
+        students: [],
         totalBatches: 2,
         currentBatches: 1,
         totalStudents: 31,
         totalEarnings: 1450,
         rating: 4.8,
         joiningDate: '2023-01-15',
-        batches: [
-          { id: 1, name: 'Business Bootcamp - Batch 1', students: 15, status: 'ongoing' },
-          { id: 4, name: 'Business Bootcamp - Batch 0', students: 16, status: 'completed' }
-        ],
         earnings: [
           { month: 'January', amount: 450 },
           { month: 'February', amount: 520 },
           { month: 'March', amount: 480 }
-        ],
-        students: [
-          { id: 1, name: 'Alex Johnson', batch: 'Business Bootcamp - Batch 1', performance: 'Excellent' },
-          { id: 2, name: 'Morgan Smith', batch: 'Business Bootcamp - Batch 1', performance: 'Good' },
-          { id: 3, name: 'Jamie Lee', batch: 'Business Bootcamp - Batch 0', performance: 'Excellent' }
         ]
       }
   );
 
-  console.log(teacherId);
+  const [batchData, setBatchData] = useState([]);
+  const [studentData, setStudentData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:5000/api/teachers/${teacherId}`)
-      .then((res) => setTeacherData(res.data))
-      .catch((err) => console.error(err));
+     const fetchTeacherBatchAndStudent = async () => {
+      try {
+        setLoading(true);
+        const teacherResponse = await axios.get(`http://localhost:5000/api/teachers/${teacherId}`);
+        setTeacherData(teacherResponse.data);
+
+        const batchIds = teacherResponse.data.batches || [];
+        const batchPromises = batchIds.map((batchId) =>
+          axios.get(`http://localhost:5000/api/batches/${batchId}`)
+        );
+
+        const batchResponses = await Promise.all(batchPromises);
+        const fetchedBatches = batchResponses.map((response) => response.data);
+        setBatchData(fetchedBatches);
+
+        const studentIds = teacherResponse.data.students || [];
+        const studentPromises = studentIds.map((studentId) =>
+          axios.get(`http://localhost:5000/api/students/${studentId}`)
+        );
+        const studentResponses = await Promise.all(studentPromises);
+        const fetchedStudents = studentResponses.map((response) => response.data);
+        setStudentData(fetchedStudents);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching teacher data:", error);
+        setLoading(false);
+      }
+     }
+
+    if (teacherId) {
+      fetchTeacherBatchAndStudent();
+    }
   }, [teacherId]);
-  const [editedTeacher, setEditedTeacher] = useState({
-    name: teacherData.name,
-    email: teacherData.email,
-    phone: teacherData.phone,
-    specialization: teacherData.specialization,
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditedTeacher((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSpecializationChange = (value: string) => {
-    setEditedTeacher((prev) => ({
-      ...prev,
-      specialization: value,
-    }));
-  };
-
-  const handleSaveChanges = () => {
-    // In a real app, this would update the backend
-    console.log("Updated teacher data:", editedTeacher);
-    toast({
-      title: "Changes saved",
-      description: "Teacher profile has been updated successfully",
-    });
-
-    // Update the local data to simulate a backend update
-    Object.assign(teacherData, editedTeacher);
-
-    setIsEditModalOpen(false);
-  };
 
   return (
     <div className="space-y-6">
@@ -135,10 +104,6 @@ const AdminTeacherDetails = () => {
           </Button>
           <h1 className="text-2xl font-bold">Teacher Details</h1>
         </div>
-        <Button onClick={() => setIsEditModalOpen(true)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Teacher
-        </Button>
       </div>
 
       <Card>
@@ -195,8 +160,8 @@ const AdminTeacherDetails = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Batches</p>
                   <p className="font-medium">
-                    {teacherData.currentBatches} current /{" "}
-                    {teacherData.totalBatches} total
+                    {teacherData.batches.length} current /{" "}
+                    {teacherData.batches.length} total
                   </p>
                 </div>
               </div>
@@ -208,7 +173,7 @@ const AdminTeacherDetails = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Students</p>
                   <p className="font-medium">
-                    {teacherData.totalStudents} total
+                    {teacherData.students.length} total
                   </p>
                 </div>
               </div>
@@ -265,7 +230,7 @@ const AdminTeacherDetails = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {teacherData.currentBatches}
+                      {teacherData.batches.length}
                     </div>
                   </CardContent>
                 </Card>
@@ -277,7 +242,7 @@ const AdminTeacherDetails = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {teacherData.totalStudents}
+                      {teacherData.students.length}
                     </div>
                   </CardContent>
                 </Card>
@@ -309,7 +274,7 @@ const AdminTeacherDetails = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {teacherData.batches.map((batch) => (
+                {batchData.map((batch) => (
                   <div
                     key={batch.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -319,10 +284,7 @@ const AdminTeacherDetails = () => {
                         <Briefcase className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium">{batch.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {batch.students} students
-                        </p>
+                        <p className="font-medium">{batch.batchName}</p>
                       </div>
                     </div>
                     <span
@@ -353,7 +315,7 @@ const AdminTeacherDetails = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {teacherData.students.map((student) => (
+                {studentData.map((student) => (
                   <div
                     key={student.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -362,9 +324,6 @@ const AdminTeacherDetails = () => {
                       <UserAvatar name={student.name} size="sm" />
                       <div>
                         <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {student.batch}
-                        </p>
                       </div>
                     </div>
                     <span
@@ -416,86 +375,6 @@ const AdminTeacherDetails = () => {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Edit Teacher Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Teacher Profile</DialogTitle>
-            <DialogDescription>
-              Update teacher information below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                name="name"
-                value={editedTeacher.name}
-                onChange={handleInputChange}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                value={editedTeacher.email}
-                onChange={handleInputChange}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">
-                Phone
-              </Label>
-              <Input
-                id="phone"
-                name="phone"
-                value={editedTeacher.phone}
-                onChange={handleInputChange}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="specialization" className="text-right">
-                Specialization
-              </Label>
-              <Select
-                value={editedTeacher.specialization}
-                onValueChange={handleSpecializationChange}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select specialization" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Business Strategy">
-                    Business Strategy
-                  </SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Finance">Finance</SelectItem>
-                  <SelectItem value="Entrepreneurship">
-                    Entrepreneurship
-                  </SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveChanges}>Save changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

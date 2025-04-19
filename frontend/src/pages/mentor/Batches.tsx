@@ -29,8 +29,8 @@ const MentorBatches = () => {
       try {
         setLoading(true);
         // Assume we have the teacher ID from auth context or local storage
-        const teacherId = localStorage.getItem('teacherId'); // Adjust based on your auth implementation
-        const response = await axios.get(`/api/batches/teacher/${teacherId}`);
+        const teacherId = '680289d9994a95276bcd8b79'; // Adjust based on your auth implementation
+        const response = await axios.get(`http://localhost:5000/api/batches/teacher/${teacherId}`);
         
         // Transform the data to match the frontend structure
         const formattedBatches = response.data.map(batch => {
@@ -70,6 +70,8 @@ const MentorBatches = () => {
     
     fetchBatches();
   }, []);
+
+  console.log("Batches data:", batches);
 
   // Helper function to calculate the next session date based on schedule
   const calculateNextSession = (batch) => {

@@ -127,6 +127,7 @@ const AdminBatches = () => {
   // Mapping to keep track of teacher IDs to names
   const [teacherMap, setTeacherMap] = useState<{ [key: string]: string }>({});
 
+
   // Define your form schema to match the MongoDB schema
   const formSchema = z.object({
     batchName: z.string().min(1, { message: "Batch name is required" }),
@@ -152,18 +153,21 @@ const AdminBatches = () => {
   const fetchBatches = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/batches");
+      // Modify this to populate the students field or request count
+      const res = await fetch("http://localhost:5000/api/batches?populate=students");
       const data = await res.json();
-
+  
       // Process the data to include teacher names
       const processedData = data.map((batch) => {
         const teacherName = teacherMap[batch.teacher] || "Unknown Teacher";
         return {
           ...batch,
           teacherName,
+          // Add a convenience property for student count
+          studentCount: batch.students ? batch.students.length : 0
         };
       });
-
+  
       setBatchesData(processedData);
     } catch (err) {
       console.error("Failed to fetch batches", err);
@@ -176,6 +180,7 @@ const AdminBatches = () => {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -234,6 +239,9 @@ const AdminBatches = () => {
     "Saturday",
     "Sunday",
   ];
+
+
+  
 
   const handleDayToggle = (day: string) => {
     if (selectedDays.includes(day)) {
@@ -521,7 +529,7 @@ const AdminBatches = () => {
                         <TableCell>
                           <div className="flex items-center">
                             <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {batch.totalStudents}
+                            {(batch as any).studentCount}
                           </div>
                         </TableCell>
                         <TableCell>

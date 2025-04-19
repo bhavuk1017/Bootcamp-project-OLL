@@ -47,10 +47,11 @@ const AdminDashboard = () => {
   }, []);
 
   const calculateTotalRevenueSplit = () => {
+    // Calculate revenue split from actual batch data
     const total = dashboardData.batchesMockData.reduce((sum, batch) => sum + batch.revenue, 0);
     const teacherTotal = dashboardData.batchesMockData.reduce((sum, batch) => sum + (batch.teacherEarning || 0), 0);
     const ollTotal = dashboardData.batchesMockData.reduce((sum, batch) => sum + (batch.ollShare || 0), 0);
-    const studentTotal = total - teacherTotal - ollTotal;
+    const studentTotal = dashboardData.batchesMockData.reduce((sum, batch) => sum + (batch.studentEarning || 0), 0);
 
     return {
       total,
@@ -202,6 +203,8 @@ const AdminDashboard = () => {
                   tickLine={false}
                   axisLine={false}
                   width={40}
+                  // Ensure whole numbers only for student count
+                  allowDecimals={false}
                 />
                 <Tooltip formatter={(value) => [`${value}`, 'Students']} />
                 <Line 
@@ -258,9 +261,9 @@ const AdminDashboard = () => {
                     <td className="p-4 align-middle font-medium">{batch.batchName || `Batch ${index + 1}`}</td>
                     <td className="p-4 align-middle text-center">{batch.students || 0}</td>
                     <td className="p-4 align-middle text-right">₹{batch.revenue || 0}</td>
-                    <td className="p-4 align-middle text-right">₹{(batch.revenue || 0) - (batch.teacherEarning || 0) - (batch.ollShare || 0)}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.teacherEarning || 0}</td>
-                    <td className="p-4 align-middle text-right">₹{batch.ollShare || 0}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.studentEarning || batch.revenue * 0.5}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.teacherEarning || batch.revenue * 0.2}</td>
+                    <td className="p-4 align-middle text-right">₹{batch.ollShare || batch.revenue * 0.3}</td>
                   </tr>
                 ))}
               </tbody>

@@ -3,44 +3,12 @@ import Teacher from "../models/teacher.model.js";
 import Batch from "../models/batch.model.js";
 import Student from "../models/student.model.js";
 import mongoose from "mongoose";
-import { getTeacherDashboardData } from "../controllers/teacherController.js";
+import  getTeacherDashboardData  from "../controllers/mentor/dashboard.controller.js";
 // import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// router.get('/dashboard', authenticateToken, getTeacherDashboardData);
-
-
-// POST /api/teachers
-router.post("/", async (req, res) => {
-  try {
-    const { name, email, phone, specialization, status } = req.body;
-
-    if (!name || !email || !phone) {
-      return res.status(400).json({ message: "Name, email, and phone are required." });
-    }
-
-    // Check if email already exists
-    const existingTeacher = await Teacher.findOne({ email });
-    if (existingTeacher) {
-      return res.status(400).json({ message: "Teacher with this email already exists" });
-    }
-
-    const newTeacher = new Teacher({ 
-      name, 
-      email, 
-      phone, 
-      specialization, 
-      status: status || 'active' 
-    });
-    
-    await newTeacher.save();
-    res.status(201).json(newTeacher);
-  } catch (error) {
-    console.error("Error adding teacher:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+router.get('/dashboard',getTeacherDashboardData)
 
 // GET /api/teachers
 router.get('/', async (req, res) => {
@@ -54,16 +22,16 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/teachers/:id
-router.get('/:id', async (req, res) => {
-  const { id } = req.params;
+router.get('/:teacherId', async (req, res) => {
+  const { teacherId } = req.params;
 
   // Validate ObjectId
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!mongoose.Types.ObjectId.isValid(teacherId)) {
     return res.status(400).json({ error: 'Invalid Teacher ID' });
   }
 
   try {
-    const teacher = await Teacher.findById(id);
+    const teacher = await Teacher.findById(teacherId);
     if (!teacher) {
       return res.status(404).json({ error: 'Teacher not found' });
     }
@@ -107,6 +75,37 @@ router.put('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating teacher:', err);
     res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+// POST /api/teachers
+router.post("/", async (req, res) => {
+  try {
+    const { name, email, phone, specialization, status } = req.body;
+
+    if (!name || !email || !phone) {
+      return res.status(400).json({ message: "Name, email, and phone are required." });
+    }
+
+    // Check if email already exists
+    const existingTeacher = await Teacher.findOne({ email });
+    if (existingTeacher) {
+      return res.status(400).json({ message: "Teacher with this email already exists" });
+    }
+
+    const newTeacher = new Teacher({ 
+      name, 
+      email, 
+      phone, 
+      specialization, 
+      status: status || 'active' 
+    });
+    
+    await newTeacher.save();
+    res.status(201).json(newTeacher);
+  } catch (error) {
+    console.error("Error adding teacher:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
