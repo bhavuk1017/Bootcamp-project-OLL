@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,65 +13,143 @@ import {
 } from '@/components/ui/table';
 import { Search, Users, Calendar, DollarSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-// Mock data for batches
-const batchesData = [
-  { 
-    id: 1, 
-    name: "Business Bootcamp - Batch 1", 
-    status: "ongoing", 
-    startDate: "2023-05-01",
-    endDate: "2023-07-30", 
-    students: 15,
-    earnings: 1200,
-    nextSession: "2023-06-16T15:00:00",
-    topic: "Marketing Strategies"
-  },
-  { 
-    id: 2, 
-    name: "Business Bootcamp - Batch 2", 
-    status: "ongoing", 
-    startDate: "2023-06-01",
-    endDate: "2023-08-30", 
-    students: 18,
-    earnings: 950,
-    nextSession: "2023-06-15T14:00:00",
-    topic: "Financial Planning"
-  },
-  { 
-    id: 3, 
-    name: "Entrepreneurship 101", 
-    status: "upcoming", 
-    startDate: "2023-07-01",
-    endDate: "2023-09-30", 
-    students: 12,
-    earnings: 0,
-    nextSession: "2023-07-01T13:00:00",
-    topic: "Introduction to Entrepreneurship"
-  },
-  { 
-    id: 4, 
-    name: "Business Bootcamp - Batch 0", 
-    status: "completed", 
-    startDate: "2023-02-01",
-    endDate: "2023-04-30", 
-    students: 16,
-    earnings: 1450,
-    nextSession: null,
-    topic: null
-  }
-];
+import axios from 'axios';
 
 const MentorBatches = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const filteredBatches = batchesData
+  // Fetch batches data on component mount
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        setLoading(true);
+        // Assume we have the teacher ID from auth context or local storage
+        const teacherId = '680289d9994a95276bcd8b79'; // Adjust based on your auth implementation
+        const response = await axios.get(`http://localhost:5000/api/batches/teacher/${teacherId}`);
+        
+        // Transform the data to match the frontend structure
+        const formattedBatches = response.data.map(batch => {
+          // Determine batch status based on dates
+          const today = new Date();
+          const startDate = new Date(batch.startDate);
+          const endDate = new Date(batch.endDate);
+          
+          let status = 'upcoming';
+          if (today > endDate) {
+            status = 'completed';
+          } else if (today >= startDate) {
+            status = 'ongoing';
+          }
+          
+          return {
+            id: batch._id,
+            name: batch.batchName,
+            status: status,
+            startDate: new Date(batch.startDate).toISOString().split('T')[0],
+            endDate: new Date(batch.endDate).toISOString().split('T')[0],
+            students: batch.students.length,
+            earnings: batch.revenue,
+            nextSession: calculateNextSession(batch),
+            topic: batch.sessionTopic
+          };
+        });
+        
+        setBatches(formattedBatches);
+      } catch (err) {
+        console.error("Error fetching batches:", err);
+        setError("Failed to load batches. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchBatches();
+  }, []);
+
+  console.log("Batches data:", batches);
+
+  // Helper function to calculate the next session date based on schedule
+  const calculateNextSession = (batch) => {
+    const today = new Date();
+    if (!batch.scheduleDays || batch.scheduleDays.length === 0 || !batch.sessionTime || today > new Date(batch.endDate)) {
+      return null;
+    }
+    
+    const startDate = new Date(batch.startDate);
+    const daysMap = {
+      'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 
+      'Friday': 5, 'Saturday': 6, 'Sunday': 0
+    };
+    
+    // Find the next session day
+    const todayDay = today.getDay();
+    let nextDayOffset = -1;
+    
+    // Sort batch days by their day number
+    const batchDays = batch.scheduleDays
+      .map(day => daysMap[day])
+      .sort((a, b) => {
+        // Calculate offset from today
+        const offsetA = (a - todayDay + 7) % 7;
+        const offsetB = (b - todayDay + 7) % 7;
+        // If offset is 0, it means today, so we need special handling
+        return (offsetA === 0 ? 7 : offsetA) - (offsetB === 0 ? 7 : offsetB);
+      });
+    
+    // Find the next upcoming day
+    const nextDay = batchDays.find(day => {
+      const offset = (day - todayDay + 7) % 7;
+      // If offset is 0, check if the time has passed
+      if (offset === 0) {
+        const [hours, minutes] = batch.sessionTime.split(':').map(Number);
+        const sessionTime = new Date();
+        sessionTime.setHours(hours, minutes, 0, 0);
+        return today < sessionTime;
+      }
+      return offset > 0;
+    });
+    
+    if (nextDay !== undefined) {
+      nextDayOffset = (nextDay - todayDay + 7) % 7;
+      // If nextDayOffset is 0, it means the next session is today
+      if (nextDayOffset === 0) nextDayOffset = 7;
+    } else if (batchDays.length > 0) {
+      // If we didn't find a day after today, take the first day of the next week
+      nextDayOffset = (batchDays[0] - todayDay + 7) % 7;
+    }
+    
+    if (nextDayOffset !== -1) {
+      const nextSessionDate = new Date();
+      nextSessionDate.setDate(today.getDate() + nextDayOffset);
+      
+      // Set the time
+      const [hours, minutes] = batch.sessionTime.split(':').map(Number);
+      nextSessionDate.setHours(hours, minutes, 0, 0);
+      
+      return nextSessionDate.toISOString();
+    }
+    
+    return null;
+  };
+
+  const filteredBatches = batches
     .filter(batch => 
       batch.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (activeTab === 'all' || batch.status === activeTab)
     );
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64">Loading batches...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500 text-center h-64 flex items-center justify-center">{error}</div>;
+  }
 
   return (
     <div className="space-y-6">

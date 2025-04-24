@@ -53,20 +53,20 @@ const totalEarningsData = {
 
 // Mock data for daily earnings
 const dailyEarningsData = [
-  { date: '2023-06-01', earnings: 150, studentSales: 750 },
-  { date: '2023-06-02', earnings: 200, studentSales: 1000 },
-  { date: '2023-06-03', earnings: 100, studentSales: 500 },
-  { date: '2023-06-04', earnings: 300, studentSales: 1500 },
-  { date: '2023-06-05', earnings: 250, studentSales: 1250 },
-  { date: '2023-06-06', earnings: 320, studentSales: 1600 },
-  { date: '2023-06-07', earnings: 280, studentSales: 1400 },
-  { date: '2023-06-08', earnings: 220, studentSales: 1100 },
-  { date: '2023-06-09', earnings: 190, studentSales: 950 },
-  { date: '2023-06-10', earnings: 350, studentSales: 1750 },
-  { date: '2023-06-11', earnings: 400, studentSales: 2000 },
-  { date: '2023-06-12', earnings: 280, studentSales: 1400 },
-  { date: '2023-06-13', earnings: 250, studentSales: 1250 },
-  { date: '2023-06-14', earnings: 310, studentSales: 1550 },
+  { date: '2023-06-01', earnings: 150, studentSales: 0},
+  { date: '2023-06-02', earnings: 200, studentSales: 0 },
+  { date: '2023-06-03', earnings: 100, studentSales: 0},
+  { date: '2023-06-04', earnings: 300, studentSales: 0 },
+  { date: '2023-06-05', earnings: 250, studentSales: 0 },
+  { date: '2023-06-06', earnings: 320, studentSales: 0 },
+  { date: '2023-06-07', earnings: 280, studentSales: 0 },
+  { date: '2023-06-08', earnings: 220, studentSales: 0 },
+  { date: '2023-06-09', earnings: 190, studentSales: 0},
+  { date: '2023-06-10', earnings: 350, studentSales: 0 },
+  { date: '2023-06-11', earnings: 400, studentSales: 0 },
+  { date: '2023-06-12', earnings: 280, studentSales: 0 },
+  { date: '2023-06-13', earnings: 250, studentSales: 0 },
+  { date: '2023-06-14', earnings: 310, studentSales: 0 },
 ];
 
 // Mock data for batch earnings

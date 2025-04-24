@@ -7,16 +7,19 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Mail, User, School } from 'lucide-react';
+import axios from 'axios';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [isLoading, setIsLoading] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginUserType, setLoginUserType] = useState<"student" | "teacher" | "admin">("student");
   
   // Register form state
   const [name, setName] = useState("");
@@ -24,7 +27,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [school, setSchool] = useState("");
-  const [userType, setUserType] = useState<"student" | "mentor" | "admin">("student");
+  const [userType, setUserType] = useState<"student" | "teacher" | "admin">("student");
   
   // Check URL parameters for tab selection
   useEffect(() => {
@@ -35,76 +38,84 @@ const Login = () => {
     }
   }, [location]);
   
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!loginEmail || !loginPassword) {
+    try {
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        email: loginEmail,
+        password: loginPassword,
+        userType: loginUserType
+      });
+      
+      // Store token and user data in localStorage
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      // Navigate based on user type
+      const redirectPath = `/${response.data.user.userType}/dashboard`;
+      navigate(redirectPath);
+      
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in."
+      });
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please enter both email and password",
+        description: error.response?.data?.message || "Failed to login",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    // In a real app, this would be an API call to authenticate
-    // For demo purposes, we'll just navigate based on user type
-    
-    if (loginEmail.includes("student")) {
-      navigate("/student/dashboard");
-    } else if (loginEmail.includes("mentor") || loginEmail.includes("teacher")) {
-      navigate("/mentor/dashboard");
-    } else if (loginEmail.includes("admin")) {
-      navigate("/admin/dashboard");
-    } else {
-      // Default to student dashboard
-      navigate("/student/dashboard");
-    }
-    
-    toast({
-      title: "Welcome back!",
-      description: "You have successfully logged in."
-    });
   };
   
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!name || !email || !password || !confirmPassword) {
+    try {
+      // Basic validation
+      if (password !== confirmPassword) {
+        toast({
+          title: "Error",
+          description: "Passwords do not match",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const response = await axios.post('http://localhost:5000/api/auth/register', {
+        name,
+        email,
+        password,
+        userType,
+        school: userType === 'student' ? school : undefined
+      });
+      
+      // Store token and user data in localStorage
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      // Navigate based on user type
+      const redirectPath = `/${response.data.user.userType}/dashboard`;
+      navigate(redirectPath);
+      
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created."
+      });
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: error.response?.data?.message || "Failed to register",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // In a real app, this would be an API call to register the user
-    // For demo purposes, we'll just navigate based on user type
-    
-    if (userType === "student") {
-      navigate("/student/dashboard");
-    } else if (userType === "mentor") {
-      navigate("/mentor/dashboard");
-    } else if (userType === "admin") {
-      navigate("/admin/dashboard");
-    }
-    
-    toast({
-      title: "Registration successful!",
-      description: "Your account has been created.",
-    });
   };
   
   return (
@@ -136,6 +147,39 @@ const Login = () => {
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
+                  <Label>Account Type</Label>
+                  <div className="flex gap-4">
+                    <Button 
+                      type="button" 
+                      variant={loginUserType === "student" ? "default" : "outline"}
+                      onClick={() => setLoginUserType("student")}
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      Student
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant={loginUserType === "teacher" ? "default" : "outline"}
+                      onClick={() => setLoginUserType("teacher")}
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      Teacher
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant={loginUserType === "admin" ? "default" : "outline"}
+                      onClick={() => setLoginUserType("admin")}
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      Admin
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -146,6 +190,7 @@ const Login = () => {
                       className="pl-10"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -165,12 +210,13 @@ const Login = () => {
                       className="pl-10"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full">
-                  Login
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </TabsContent>
@@ -188,6 +234,7 @@ const Login = () => {
                       className="pl-10"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -203,6 +250,7 @@ const Login = () => {
                       className="pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -218,6 +266,7 @@ const Login = () => {
                         className="pl-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                   </div>
@@ -232,6 +281,7 @@ const Login = () => {
                         className="pl-10"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                   </div>
@@ -248,6 +298,7 @@ const Login = () => {
                       className="pl-10"
                       value={school}
                       onChange={(e) => setSchool(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -260,22 +311,33 @@ const Login = () => {
                       variant={userType === "student" ? "default" : "outline"}
                       onClick={() => setUserType("student")}
                       className="flex-1"
+                      disabled={isLoading}
                     >
                       Student
                     </Button>
                     <Button 
                       type="button" 
-                      variant={userType === "mentor" ? "default" : "outline"}
-                      onClick={() => setUserType("mentor")}
+                      variant={userType === "teacher" ? "default" : "outline"}
+                      onClick={() => setUserType("teacher")}
                       className="flex-1"
+                      disabled={isLoading}
                     >
-                      Mentor
+                      Teacher
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant={userType === "admin" ? "default" : "outline"}
+                      onClick={() => setUserType("admin")}
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      Admin
                     </Button>
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full">
-                  Create Account
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Creating account..." : "Create Account"}
                 </Button>
               </form>
             </TabsContent>

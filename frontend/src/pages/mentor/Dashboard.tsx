@@ -1,41 +1,124 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Users, Calendar, ArrowRight, BarChart3, Clock } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
-// Mock data for the mentor dashboard
-const mentorData = {
-  totalEarnings: 2450,
-  totalStudents: 45,
-  totalBatches: 3,
-  nextSession: {
-    date: "2023-06-15T14:00:00",
-    batch: "Business Bootcamp - Batch 2",
-    topic: "Marketing Strategies for Small Businesses"
-  },
-  recentBatches: [
-    { id: 1, name: "Business Bootcamp - Batch 1", status: "ongoing", students: 15, earnings: 1200 },
-    { id: 2, name: "Business Bootcamp - Batch 2", status: "ongoing", students: 18, earnings: 950 },
-    { id: 3, name: "Entrepreneurship 101", status: "upcoming", students: 12, earnings: 0 }
-  ]
-};
+import axios from 'axios';
 
 const MentorDashboard = () => {
   const navigate = useNavigate();
-  const nextSessionDate = new Date(mentorData.nextSession.date);
-  const formattedDate = nextSessionDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  const formattedTime = nextSessionDate.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // For development only - until auth is implemented
+        // You can add a mock axios interceptor here to add the auth token once implemented
+        /*
+        axios.interceptors.request.use(config => {
+          const token = localStorage.getItem('token');
+          if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+          }
+          return config;
+        });
+        */
+        
+        const response = await axios.get('http://localhost:5000/api/teachers/dashboard');
+        setDashboardData(response.data);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again later.');
+        setLoading(false);
+        
+        // For development only - fallback to mock data if the API fails
+        // Remove this in production
+        setMockDataForDevelopment();
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // For development only - mock data function
+  const setMockDataForDevelopment = () => {
+    const mockData = {
+      totalEarnings: "1200.00",
+      totalStudents: 24,
+      totalBatches: 3,
+      recentBatches: [
+        {
+          id: "1",
+          name: "Advanced JavaScript 2025",
+          status: "ongoing",
+          students: 8,
+          earnings: "320.00"
+        },
+        {
+          id: "2",
+          name: "React Fundamentals",
+          status: "upcoming",
+          students: 10,
+          earnings: "400.00"
+        },
+        {
+          id: "3",
+          name: "Node.js Backend",
+          status: "completed",
+          students: 6,
+          earnings: "240.00"
+        }
+      ],
+      batches: [],
+      students: [],
+      nextSession: {
+        batchId: "1",
+        batch: "Advanced JavaScript 2025",
+        date: new Date(new Date().getTime() + 86400000), // tomorrow
+        topic: "ES6 Features and Modern JavaScript"
+      }
+    };
+    
+    setDashboardData(mockData);
+    setLoading(false);
+    setError(null);
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64">Loading dashboard data...</div>;
+  }
+
+  if (error && !dashboardData) {
+    return <div className="text-red-500 text-center p-4">{error}</div>;
+  }
+
+  if (!dashboardData) {
+    return <div className="text-center p-4">No dashboard data available.</div>;
+  }
+
+  // Format next session date if available
+  let formattedDate = '';
+  let formattedTime = '';
+  
+  if (dashboardData.nextSession) {
+    const nextSessionDate = new Date(dashboardData.nextSession.date);
+    formattedDate = nextSessionDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    formattedTime = nextSessionDate.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -43,13 +126,25 @@ const MentorDashboard = () => {
         <h1 className="text-2xl font-bold">Mentor Dashboard</h1>
       </div>
 
+      {error && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                {error} Using demo data for preview.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Earnings</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <DollarSign className="mr-2 h-6 w-6 text-success" />
-              ${mentorData.totalEarnings}
+              <DollarSign className="mr-2 h-6 w-6 text-green-500" />
+              ${dashboardData.totalEarnings}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -63,13 +158,13 @@ const MentorDashboard = () => {
           <CardHeader className="pb-2">
             <CardDescription>Students</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <Users className="mr-2 h-6 w-6 text-primary" />
-              {mentorData.totalStudents}
+              <Users className="mr-2 h-6 w-6 text-blue-500" />
+              {dashboardData.students.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Across {mentorData.totalBatches} batches
+              Across {dashboardData.batches.length} batches
             </p>
           </CardContent>
         </Card>
@@ -78,56 +173,54 @@ const MentorDashboard = () => {
           <CardHeader className="pb-2">
             <CardDescription>Batches</CardDescription>
             <CardTitle className="text-3xl flex items-center">
-              <BarChart3 className="mr-2 h-6 w-6 text-accent" />
-              {mentorData.totalBatches}
+              <BarChart3 className="mr-2 h-6 w-6 text-purple-500" />
+              {dashboardData.batches.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Button 
-              variant="link" 
-              className="p-0 h-auto" 
-              onClick={() => navigate('/mentor/batches')}
-            >
-              View all batches
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
+            {/* No button as requested */}
           </CardContent>
         </Card>
       </div>
 
       {/* Next session card */}
-      <Card className="bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Calendar className="mr-2 h-5 w-5 text-primary" />
-            Next Session
-          </CardTitle>
-          <CardDescription>
-            {mentorData.nextSession.batch}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col space-y-1">
-            <div className="flex items-center text-sm">
-              <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>
-                {formattedDate} at {formattedTime}
-              </span>
+      {dashboardData.nextSession ? (
+        <Card className="bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-5 w-5 text-primary" />
+              Next Session
+            </CardTitle>
+            <CardDescription>
+              {dashboardData.nextSession.batch}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col space-y-1">
+              <div className="flex items-center text-sm">
+                <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>
+                  {formattedDate} at {formattedTime}
+                </span>
+              </div>
+              <div className="text-sm font-medium">
+                Topic: {dashboardData.nextSession.topic}
+              </div>
             </div>
-            <div className="text-sm font-medium">
-              Topic: {mentorData.nextSession.topic}
+            <div className="flex gap-2">
+              <Button>
+                Join Session
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/mentor/sessions/${dashboardData.nextSession.batchId}`)}
+              >
+                Session Details
+              </Button>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button>
-              Join Session
-            </Button>
-            <Button variant="outline" onClick={() => navigate(`/mentor/sessions/${1}`)}>
-              Session Details
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Recent batches */}
       <Card>
@@ -147,40 +240,43 @@ const MentorDashboard = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mentorData.recentBatches.map((batch) => (
-                <TableRow key={batch.id}>
-                  <TableCell className="font-medium">{batch.name}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      batch.status === 'ongoing' 
-                        ? 'bg-green-100 text-green-800' 
-                        : batch.status === 'upcoming' 
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {batch.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>{batch.students}</TableCell>
-                  <TableCell className="text-right">${batch.earnings}</TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => navigate(`/mentor/batches/${batch.id}`)}
-                    >
-                      View
-                    </Button>
+              {dashboardData.recentBatches && dashboardData.recentBatches.length > 0 ? (
+                dashboardData.recentBatches.map((batch) => (
+                  <TableRow key={batch.id}>
+                    <TableCell className="font-medium">{batch.name}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        batch.status === 'ongoing' 
+                          ? 'bg-green-100 text-green-800' 
+                          : batch.status === 'upcoming' 
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {batch.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>{batch.students}</TableCell>
+                    <TableCell className="text-right">${batch.earnings}</TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => navigate(`/mentor/batches/${batch.id}`)}
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-4">
+                    No batches found
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
-          <div className="mt-4 flex justify-end">
-            <Button variant="outline" onClick={() => navigate('/mentor/batches')}>
-              View All Batches
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

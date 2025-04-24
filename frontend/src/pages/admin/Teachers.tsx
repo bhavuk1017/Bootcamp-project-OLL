@@ -53,16 +53,19 @@ import {
 import UserAvatar from '@/components/ui-custom/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const AdminTeachers = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddTeacherDialog, setShowAddTeacherDialog] = useState(false);
+  const [showEditTeacherDialog, setShowEditTeacherDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [teachersData, setTeachersData] = useState([
     {
-      id: 1,
+      _id: 1,
       name: 'Jamie Smith',
       email: 'jamie.smith@example.com',
       phone: '+1 234-567-8901',
@@ -72,38 +75,57 @@ const AdminTeachers = () => {
       currentBatches: 1,
       totalStudents: 31,
       totalEarnings: 1450,
+      batches: [],
+      students: [],
       rating: 4.8,
       joiningDate: '2023-01-15'
     },
-  
   ]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchTeachers = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/teachers");
-        const data = await res.json();
-        setTeachersData(data);
-      } catch (err) {
-        console.error("Failed to fetch teachers", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-  
-    fetchTeachers();
-  }, []);
-  
-  const form = useForm({
+  const addForm = useForm({
     defaultValues: {
       name: '',
       email: '',
-      phone: ''
+      phone: '',
+      specialization: '',
+      status: 'active'
     }
   });
+
+  const editForm = useForm({
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      specialization: '',
+      status: ''
+    }
+  });
+
+  const fetchTeachers = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("http://localhost:5000/api/teachers");
+      const data = await res.json();
+      setTeachersData(data);
+    } catch (err) {
+      console.error("Failed to fetch teachers", err);
+      toast({
+        title: "Error",
+        description: "Failed to fetch teachers",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
   
-  const handleAddTeacher = async (data: any) => {
+  const handleAddTeacher = async (data) => {
     try {
       const response = await fetch("http://localhost:5000/api/teachers", {
         method: "POST",
@@ -121,7 +143,8 @@ const AdminTeachers = () => {
           description: "New teacher has been successfully added"
         });
         setShowAddTeacherDialog(false);
-        form.reset();
+        addForm.reset();
+        fetchTeachers();
       } else {
         toast({
           title: "Error",
@@ -136,6 +159,88 @@ const AdminTeachers = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditTeacher = async (data) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/teachers/${selectedTeacher._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      });
+  
+      const result = await response.json();
+  
+      if (response.ok) {
+        toast({
+          title: "Teacher updated",
+          description: "Teacher information has been successfully updated"
+        });
+        setShowEditTeacherDialog(false);
+        fetchTeachers();
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to update teacher",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Network Error",
+        description: "Could not connect to the server",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteTeacher = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/teachers/${selectedTeacher._id}`, {
+        method: "DELETE"
+      });
+  
+      if (response.ok) {
+        toast({
+          title: "Teacher deleted",
+          description: "Teacher has been successfully removed"
+        });
+        setShowDeleteDialog(false);
+        fetchTeachers();
+      } else {
+        const result = await response.json();
+        toast({
+          title: "Error",
+          description: result.message || "Failed to delete teacher",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Network Error",
+        description: "Could not connect to the server",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openEditDialog = (teacher) => {
+    setSelectedTeacher(teacher);
+    editForm.reset({
+      name: teacher.name || '',
+      email: teacher.email || '',
+      phone: teacher.phone || '',
+      specialization: teacher.specialization || '',
+      status: teacher.status || 'inactive'
+    });
+    setShowEditTeacherDialog(true);
+  };
+
+  const openDeleteDialog = (teacher) => {
+    setSelectedTeacher(teacher);
+    setShowDeleteDialog(true);
   };
 
   const filteredTeachers = teachersData
@@ -198,9 +303,15 @@ const AdminTeachers = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTeachers.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    Loading teachers...
+                  </TableCell>
+                </TableRow>
+              ) : filteredTeachers.length > 0 ? (
                 filteredTeachers.map((teacher) => (
-                  <TableRow key={teacher.id}>
+                  <TableRow key={teacher._id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <UserAvatar name={teacher.name || ''} size="sm" />
@@ -233,15 +344,15 @@ const AdminTeachers = () => {
                       <div className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <span className="font-medium">{teacher.currentBatches || 0}</span>
-                          <span className="text-muted-foreground"> / {teacher.totalBatches || 0}</span>
+                          <span className="font-medium">{teacher.batches.length || 0}</span>
+                          <span className="text-muted-foreground"> / {teacher.batches.length || 0}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span>{teacher.totalStudents || 0}</span>
+                        <span>{teacher.batches.length || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -254,7 +365,7 @@ const AdminTeachers = () => {
                       {teacher.rating > 0 ? (
                         <div className="flex items-center">
                           <Star className="h-4 w-4 mr-1 text-yellow-500 fill-yellow-500" />
-                          <span>{teacher.rating}</span>
+                          <span>{teacher.rating || 0}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">N/A</span>
@@ -265,7 +376,7 @@ const AdminTeachers = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => navigate(`/admin/teachers/${teacher.id}`)}
+                          onClick={() => navigate(`/admin/teachers/${teacher._id}`)}
                         >
                           View
                         </Button>
@@ -276,11 +387,17 @@ const AdminTeachers = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="flex items-center">
+                            <DropdownMenuItem 
+                              className="flex items-center" 
+                              onClick={() => openEditDialog(teacher)}
+                            >
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Teacher
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="flex items-center text-destructive">
+                            <DropdownMenuItem 
+                              className="flex items-center text-destructive"
+                              onClick={() => openDeleteDialog(teacher)}
+                            >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete Teacher
                             </DropdownMenuItem>
@@ -302,6 +419,7 @@ const AdminTeachers = () => {
         </CardContent>
       </Card>
 
+      {/* Add Teacher Dialog */}
       <Dialog open={showAddTeacherDialog} onOpenChange={setShowAddTeacherDialog}>
         <DialogContent>
           <DialogHeader>
@@ -311,10 +429,10 @@ const AdminTeachers = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleAddTeacher)} className="space-y-4">
+          <Form {...addForm}>
+            <form onSubmit={addForm.handleSubmit(handleAddTeacher)} className="space-y-4">
               <FormField
-                control={form.control}
+                control={addForm.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -329,7 +447,7 @@ const AdminTeachers = () => {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -343,7 +461,7 @@ const AdminTeachers = () => {
                 />
                 
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
@@ -351,6 +469,47 @@ const AdminTeachers = () => {
                       <FormControl>
                         <Input placeholder="Enter phone number" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={addForm.control}
+                  name="specialization"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specialization</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Teacher's specialization" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addForm.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -367,6 +526,136 @@ const AdminTeachers = () => {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Teacher Dialog */}
+      <Dialog open={showEditTeacherDialog} onOpenChange={setShowEditTeacherDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Teacher</DialogTitle>
+            <DialogDescription>
+              Update teacher information.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditTeacher)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter teacher's full name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Enter email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter phone number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="specialization"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specialization</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Teacher's specialization" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setShowEditTeacherDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Update Teacher</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the teacher
+              {selectedTeacher && ` "${selectedTeacher.name}"`} and remove their data from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTeacher}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,56 +1,63 @@
 import mongoose from 'mongoose';
+const { Schema } = mongoose;
 
 const teacherSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        trim: true
-    },
-    email: {
-        type: String,
-        trim: true,
-        lowercase: true
-    },
-    phone: {
-        type: String,
-        trim: true
-    },
-    location: {
-        type: String,
-        trim: true
-    },
-    jobTitle: {
-        type: String,
-        trim: true
-    },
-    yearOfExp: {
-        type: String,
-        trim: true
-    },
-    specialization: {
-        type: String,
-        trim: true,
-        default: "None"
-    },
-    status: {
-        type: String,
-        trim: true,
-        default: "Unknown"
-    },
-    bio: {
-        type: String,
-        trim: true
-    },
-    earning: {
-        type: Number,
-        default: 0 // not coming from form, for later use
-    },
-    rating: {
-        type: Number,
-        default: 0 // not coming from form, for later use
-    }
+  name: String,
+  email: String,
+  phone: String,
+  location: String,
+  jobTitle: String,
+  yearOfExp: String,
+  specialization: {
+    type: String,
+    default: "None"
+  },
+  status: {
+    type: String,
+    default: "Unknown"
+  },
+  bio: String,
+  earning: {
+    type: Number,
+    default: 0
+  },
+  rating: {
+    type: Number,
+    default: 0
+  },
+  totalBatches: {
+    type: Number,
+    default: 0
+  },
+  currentBatches: {
+    type: Number,
+    default: 0
+  },
+  totalStudents: {
+    type: Number,
+    default: 0
+  },
+  totalEarnings: {
+    type: Number,
+    default: 0
+  },
+  joiningDate: Date,
+  batches: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Batch'
+  }],
+  students: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student'
+  }],
+  earnings: [{
+    month: String,
+    amount: Number
+  }]
 }, {
-    timestamps: true
+  timestamps: true
 });
+
 
 const Teacher = mongoose.model('Teacher', teacherSchema);
 export default Teacher;

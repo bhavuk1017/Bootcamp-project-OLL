@@ -1,49 +1,48 @@
+import React from "react";
 
-import React from 'react';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+const UserAvatar = ({ name, size = "md", className = "" }) => {
+  // Default to a placeholder if no name is provided
+  const initials = name 
+    ? name.split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2)
+    : "?";
 
-interface UserAvatarProps {
-  name: string;
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
-  className?: string;
-  highlight?: boolean;
-}
-
-const UserAvatar: React.FC<UserAvatarProps> = ({ 
-  name, 
-  size = "md",
-  className,
-  highlight = false
-}) => {
-  const initials = name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .substring(0, 2);
-  
+  // Size classes
   const sizeClasses = {
-    "xs": "h-6 w-6 text-xs",
-    "sm": "h-8 w-8 text-sm",
-    "md": "h-10 w-10 text-base",
-    "lg": "h-16 w-16 text-xl",
-    "xl": "h-24 w-24 text-2xl"
+    xs: "h-8 w-8 text-xs",
+    sm: "h-10 w-10 text-sm",
+    md: "h-12 w-12 text-base",
+    lg: "h-16 w-16 text-lg",
+    xl: "h-24 w-24 text-xl"
   };
+
+  // Generate a consistent color based on the name (if provided)
+  const colors = [
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-purple-500",
+    "bg-pink-500",
+    "bg-indigo-500",
+    "bg-yellow-500",
+    "bg-red-500",
+    "bg-teal-500"
+  ];
   
+  // Use a default color if no name is provided
+  const colorIndex = name 
+    ? name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length
+    : 0;
+
   return (
-    <Avatar className={cn(
-      sizeClasses[size], 
-      highlight && "ring-2 ring-primary ring-offset-2",
-      className
-    )}>
-      <AvatarFallback className={cn(
-        "bg-primary/10 text-primary font-medium",
-        highlight && "bg-primary/20"
-      )}>
-        {initials}
-      </AvatarFallback>
-    </Avatar>
+    <div
+      className={`${sizeClasses[size] || sizeClasses.md} ${colors[colorIndex]} rounded-full flex items-center justify-center text-white font-semibold ${className}`}
+      aria-label={name || "User"}
+    >
+      {initials}
+    </div>
   );
 };
 
