@@ -7,11 +7,7 @@ import batchRoutes from "./routes/batches.route.js";
 import studentRoutes from "./routes/students.route.js";
 import teacherRoutes from "./routes/teachers.route.js";
 import profileRoutes from "./routes/profile.route.js";
-<<<<<<< HEAD
-import authRoutes from "./routes/auth.routes.js";
-=======
 import dashboardRoutes from "./routes/dashboard.route.js"; // Assuming you have a dashboard route
->>>>>>> 53b16df50ba1c5ed2fc8d4acc6ff9bda366e546e
 
 dotenv.config();
 const app = express();
