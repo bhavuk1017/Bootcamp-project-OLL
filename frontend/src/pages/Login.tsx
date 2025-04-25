@@ -58,6 +58,9 @@ const Login = () => {
       // Call login from auth context
       const userData = await login(loginEmail, loginPassword);
       console.log('Login successful, user data:', userData);
+
+      localStorage.setItem('id', userData._id);
+      localStorage.setItem('token',userData.token);
       
       toast({
         title: "Welcome back!",

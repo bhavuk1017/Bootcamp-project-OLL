@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,39 +8,85 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, Mail, Phone, User, MapPin, Briefcase, Calendar, Shield, Edit, Users, Star, Clock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
+import axios from 'axios';
 
-// Note: FileUpload was changed to Upload to fix the error
 
 const MentorProfile = () => {
   // Use State for profile data
   const [profile, setProfile] = useState({
-    name: "Sarah Johnson",
-    email: "sarah.johnson@oll.co",
-    phone: "+1 (555) 123-4567",
-    location: "Boston, MA",
-    bio: "Experienced entrepreneurship mentor with a passion for helping students develop their business ideas. Specializing in product development and go-to-market strategies.",
-    jobTitle: "Senior Business Mentor",
-    yearsExperience: 8,
-    specialization: "Product Development",
-    students: 11,
-    averageRating: 4.7,
-    education: [
-      "MBA, Harvard Business School",
-      "BS in Business Administration, Boston University"
-    ],
-    achievements: [
-      "Led 3 startup incubator programs",
-      "Mentored over 50 student-led businesses",
-      "Former VP of Product at TechStart Inc."
-    ]
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    bio: "",
+    jobTitle: "",
+    yearOfExp: 0,
+    specialization: "",
+    totalStudents: 0,
+    rating: 0,
+    students: []
   });
+  
+  // State for student data
+  const [studentData, setStudentData] = useState([]);
+  // Loading states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState({...profile});
   
+  // Fetch teacher data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get teacher ID from localStorage
+        const teacherId = localStorage.getItem('id');
+        
+        if (!teacherId) {
+          throw new Error('Teacher ID not found in localStorage');
+        }
+        
+        // Fetch teacher data
+        const teacherResponse = await axios.get(`http://localhost:5000/api/teachers/${teacherId}`);
+        const teacherData = teacherResponse.data;
+        
+        setProfile(teacherData);
+        setEditedProfile(teacherData);
+        
+        // Fetch student data for each student ID
+        if (teacherData.students && teacherData.students.length > 0) {
+          const studentsPromises = teacherData.students.map(studentId => 
+            axios.get(`http://localhost:5000/api/students/${studentId}`)
+          );
+          
+          const studentsResponses = await Promise.all(studentsPromises);
+          const studentsData = studentsResponses.map(response => response.data);
+          
+          setStudentData(studentsData);
+        }
+        
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError(err.message);
+        setIsLoading(false);
+        toast({
+          title: "Error",
+          description: `Failed to load profile: ${err.message}`,
+          variant: "destructive"
+        });
+      }
+    };
+    
+    fetchData();
+  }, []);
+  
   // Handle input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setEditedProfile({
       ...editedProfile,
@@ -65,6 +110,30 @@ const MentorProfile = () => {
     setIsEditing(false);
   };
   
+  // Display loading state
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Display error state
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <p className="text-lg text-red-500 mb-4">Failed to load profile</p>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -83,7 +152,7 @@ const MentorProfile = () => {
             <div className="flex flex-col items-center space-y-3">
               <Avatar className="h-24 w-24">
                 <AvatarImage src="/placeholder.svg" alt={profile.name} />
-                <AvatarFallback>{profile.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                <AvatarFallback>{profile.name ? profile.name.split(' ').map(n => n[0]).join('') : 'MN'}</AvatarFallback>
               </Avatar>
               <div className="text-center">
                 <CardTitle>{profile.name}</CardTitle>
@@ -123,21 +192,21 @@ const MentorProfile = () => {
                   <div className="flex items-center justify-center">
                     <Users size={16} className="text-primary" />
                   </div>
-                  <p className="text-xl font-bold">{profile.students}</p>
+                  <p className="text-xl font-bold">{profile.students.length || 0}</p>
                   <p className="text-xs text-muted-foreground">Students</p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center">
                     <Star size={16} className="text-yellow-500" />
                   </div>
-                  <p className="text-xl font-bold">{profile.averageRating}</p>
+                  <p className="text-xl font-bold">{profile.rating || 0}</p>
                   <p className="text-xs text-muted-foreground">Rating</p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center">
                     <Clock size={16} className="text-accent" />
                   </div>
-                  <p className="text-xl font-bold">{profile.yearsExperience}</p>
+                  <p className="text-xl font-bold">{profile.yearOfExp || 0}</p>
                   <p className="text-xs text-muted-foreground">Years</p>
                 </div>
               </div>
@@ -204,12 +273,12 @@ const MentorProfile = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="yearsExperience">Years of Experience</Label>
+                    <Label htmlFor="yearOfExp">Years of Experience</Label>
                     <Input 
-                      id="yearsExperience"
-                      name="yearsExperience"
+                      id="yearOfExp"
+                      name="yearOfExp"
                       type="number"
-                      value={editedProfile.yearsExperience}
+                      value={editedProfile.yearOfExp}
                       onChange={handleChange}
                     />
                   </div>
@@ -252,25 +321,40 @@ const MentorProfile = () => {
                 <CardTitle>About</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p>{profile.bio}</p>
+                <p>{profile.bio || "No bio information available."}</p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="font-medium mb-2">Education</h3>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {profile.education.map((edu, index) => (
-                        <li key={index} className="text-sm">{edu}</li>
-                      ))}
-                    </ul>
+                    <h3 className="font-medium mb-2">Joining Date</h3>
+                    <p className="text-sm">
+                      {profile.joiningDate ? new Date(profile.joiningDate).toLocaleDateString() : "Not available"}
+                    </p>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium mb-2">Achievements</h3>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {profile.achievements.map((achievement, index) => (
-                        <li key={index} className="text-sm">{achievement}</li>
-                      ))}
-                    </ul>
+                    <h3 className="font-medium mb-2">Status</h3>
+                    <div className="flex items-center">
+                      <span className={`inline-block w-2 h-2 rounded-full mr-2 ${profile.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                      <span className="text-sm capitalize">{profile.status || "Unknown"}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Teaching Statistics</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 bg-muted/20 rounded-lg text-center">
+                      <p className="text-lg font-bold">{profile.totalBatches || 0}</p>
+                      <p className="text-xs text-muted-foreground">Total Batches</p>
+                    </div>
+                    <div className="p-4 bg-muted/20 rounded-lg text-center">
+                      <p className="text-lg font-bold">{profile.currentBatches || 0}</p>
+                      <p className="text-xs text-muted-foreground">Current Batches</p>
+                    </div>
+                    <div className="p-4 bg-muted/20 rounded-lg text-center">
+                      <p className="text-lg font-bold">${profile.totalEarnings || 0}</p>
+                      <p className="text-xs text-muted-foreground">Total Earnings</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -285,89 +369,59 @@ const MentorProfile = () => {
           <CardDescription>Students you are currently mentoring</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-hidden">
-            <table className="w-full caption-bottom text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="h-12 px-4 text-left align-middle font-medium">Student</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">Business</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">Progress</th>
-                  <th className="h-12 px-4 text-right align-middle font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b transition-colors hover:bg-muted/20">
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>EM</AvatarFallback>
-                      </Avatar>
-                      <span>Ethan Miller</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle">Sustainable Bags</td>
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: '75%' }}></div>
-                      </div>
-                      <span className="text-xs">75%</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle text-right">
-                    <Button variant="ghost" size="sm">View</Button>
-                  </td>
-                </tr>
-                <tr className="border-b transition-colors hover:bg-muted/20">
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>LW</AvatarFallback>
-                      </Avatar>
-                      <span>Lucas Wright</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle">Handcrafted Jewelry</td>
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: '60%' }}></div>
-                      </div>
-                      <span className="text-xs">60%</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle text-right">
-                    <Button variant="ghost" size="sm">View</Button>
-                  </td>
-                </tr>
-                <tr className="transition-colors hover:bg-muted/20">
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>IK</AvatarFallback>
-                      </Avatar>
-                      <span>Isabella Kim</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle">Eco-friendly Stationery</td>
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: '40%' }}></div>
-                      </div>
-                      <span className="text-xs">40%</span>
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle text-right">
-                    <Button variant="ghost" size="sm">View</Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-center mt-4">
-            <Button variant="outline">View All Students</Button>
-          </div>
+          {studentData.length > 0 ? (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full caption-bottom text-sm">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="h-12 px-4 text-left align-middle font-medium">Student</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium">School</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium">Progress</th>
+                    <th className="h-12 px-4 text-right align-middle font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentData.slice(0, 3).map((student, index) => (
+                    <tr key={student._id} className={index !== studentData.length - 1 ? "border-b transition-colors hover:bg-muted/20" : "transition-colors hover:bg-muted/20"}>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>{student.name ? student.name.split(' ').map(n => n[0]).join('') : 'ST'}</AvatarFallback>
+                          </Avatar>
+                          <span>{student.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">{student.school || "Not specified"}</td>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary" 
+                              style={{ width: `${student.taskCompletion || 0}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs">{student.taskCompletion || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle text-right">
+                        <Button variant="ghost" size="sm">View</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No students found</p>
+            </div>
+          )}
+          
+          {studentData.length > 3 && (
+            <div className="flex justify-center mt-4">
+              <Button variant="outline">View All Students</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

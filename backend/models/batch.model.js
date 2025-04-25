@@ -20,6 +20,10 @@ const batchSchema = new mongoose.Schema({
     scheduleDays: [String],
     sessionTime: String,
     sessionTopic: String,
+    session: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session'  // Reference to Session model
+    }],
     totalStudents: {
         type: Number,
         default: 10

@@ -12,24 +12,31 @@ const MentorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  console.log(localStorage.getItem('id'));
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
         
-        // For development only - until auth is implemented
-        // You can add a mock axios interceptor here to add the auth token once implemented
-        /*
-        axios.interceptors.request.use(config => {
-          const token = localStorage.getItem('token');
-          if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
-          }
-          return config;
-        });
-        */
+        // Get auth token from local storage
+        const token = localStorage.getItem('token');
         
-        const response = await axios.get('http://localhost:5000/api/teachers/dashboard');
+        if (!token) {
+          // Redirect to login if no token
+          navigate('/login');
+          return;
+        }
+        
+        // Configure axios with authorization header
+        const config = {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        };
+        
+        // Fetch teacher dashboard data with auth token
+        const response = await axios.get('http://localhost:5000/api/teachers/dashboard', config);
         setDashboardData(response.data);
         setLoading(false);
       } catch (err) {
@@ -38,17 +45,17 @@ const MentorDashboard = () => {
         setLoading(false);
         
         // For development only - fallback to mock data if the API fails
-        // Remove this in production
         setMockDataForDevelopment();
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [navigate]);
 
   // For development only - mock data function
   const setMockDataForDevelopment = () => {
     const mockData = {
+      teacherName: "John Doe",
       totalEarnings: "1200.00",
       totalStudents: 24,
       totalBatches: 3,
@@ -123,7 +130,9 @@ const MentorDashboard = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mentor Dashboard</h1>
+        <h1 className="text-2xl font-bold">
+          {dashboardData.teacherName ? `${dashboardData.teacherName}'s Dashboard` : 'Mentor Dashboard'}
+        </h1>
       </div>
 
       {error && (
@@ -159,12 +168,12 @@ const MentorDashboard = () => {
             <CardDescription>Students</CardDescription>
             <CardTitle className="text-3xl flex items-center">
               <Users className="mr-2 h-6 w-6 text-blue-500" />
-              {dashboardData.students.length}
+              {dashboardData.totalStudents || dashboardData.students?.length || 0}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Across {dashboardData.batches.length} batches
+              Across {dashboardData.totalBatches || dashboardData.batches?.length || 0} batches
             </p>
           </CardContent>
         </Card>
@@ -174,7 +183,7 @@ const MentorDashboard = () => {
             <CardDescription>Batches</CardDescription>
             <CardTitle className="text-3xl flex items-center">
               <BarChart3 className="mr-2 h-6 w-6 text-purple-500" />
-              {dashboardData.batches.length}
+              {dashboardData.totalBatches || dashboardData.batches?.length || 0}
             </CardTitle>
           </CardHeader>
           <CardContent>

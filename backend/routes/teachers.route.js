@@ -3,12 +3,13 @@ import Teacher from "../models/teacher.model.js";
 import Batch from "../models/batch.model.js";
 import Student from "../models/student.model.js";
 import mongoose from "mongoose";
-import  getTeacherDashboardData  from "../controllers/mentor/dashboard.controller.js";
-// import { authenticateToken } from "../middleware/auth.js";
+import  {getTeacherDashboardData}  from "../controllers/mentor/dashboard.controller.js";
+import { protect, authorize } from '../middleware/auth.middleware.js';
+
 
 const router = express.Router();
 
-router.get('/dashboard',getTeacherDashboardData)
+router.get('/dashboard', protect, authorize('Teacher','Mentor'), getTeacherDashboardData);
 
 // GET /api/teachers
 router.get('/', async (req, res) => {

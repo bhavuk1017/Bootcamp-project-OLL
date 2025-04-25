@@ -29,7 +29,7 @@ const MentorBatches = () => {
       try {
         setLoading(true);
         // Assume we have the teacher ID from auth context or local storage
-        const teacherId = '680289d9994a95276bcd8b79'; // Adjust based on your auth implementation
+        const teacherId = localStorage.getItem('id'); // Adjust based on your auth implementation
         const response = await axios.get(`http://localhost:5000/api/batches/teacher/${teacherId}`);
         
         // Transform the data to match the frontend structure
@@ -45,7 +45,8 @@ const MentorBatches = () => {
           } else if (today >= startDate) {
             status = 'ongoing';
           }
-          
+
+
           return {
             id: batch._id,
             name: batch.batchName,
@@ -131,7 +132,7 @@ const MentorBatches = () => {
       const [hours, minutes] = batch.sessionTime.split(':').map(Number);
       nextSessionDate.setHours(hours, minutes, 0, 0);
       
-      return nextSessionDate.toISOString();
+      return nextSessionDate;
     }
     
     return null;

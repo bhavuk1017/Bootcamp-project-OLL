@@ -188,58 +188,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Delete a batch
-// router.delete("/:id", async (req, res) => {
-//   try {
-//     const batchId = req.params.id;
-
-//     // 1. Find and delete the batch
-//     const deletedBatch = await Batch.findByIdAndDelete(batchId);
-//     if (!deletedBatch) {
-//       return res.status(404).json({ error: "Batch not found" });
-//     }
-
-//     const studentsInBatch = deletedBatch.students || [];
-//     const teacherOfBatch = deletedBatch.teacher; // assuming one teacher (ObjectId)
-
-//     // 2. Remove batch and teacher reference from students
-//     const studentPullQuery = {
-//       batches: batchId
-//     };
-
-//     if (teacherOfBatch) {
-//       studentPullQuery.teachers = teacherOfBatch;
-//     }
-
-//     await Student.updateMany(
-//       { batches: batchId },
-//       { $pull: studentPullQuery }
-//     );
-
-//     // 3. Remove batch and student references from teachers
-//     const teacherPullQuery = {
-//       batches: batchId
-//     };
-
-//     if (studentsInBatch.length > 0) {
-//       teacherPullQuery.students = { $in: studentsInBatch };
-//     }
-
-//     await Teacher.updateMany(
-//       { batches: batchId },
-//       { $pull: teacherPullQuery }
-//     );
-
-//     res.status(200).json({
-//       message: "Batch deleted successfully and all references cleaned",
-//       batch: deletedBatch,
-//     });
-
-//   } catch (error) {
-//     console.error("Failed to delete batch:", error);
-//     res.status(500).json({ error: "Failed to delete batch" });
-//   }
-// });
 
 router.delete("/:id", async (req, res) => {
   try {
@@ -289,7 +237,7 @@ router.delete("/:id", async (req, res) => {
 // Get batches by teacher ID
 router.get('/teacher/:teacherId', async (req, res) => {
   try {
-    const { teacherId } = '680289d9994a95276bcd8b79'; // req.params.teacherId; // Assuming you get this from the request params
+    const { teacherId } =  req.params; // Assuming you get this from the request params
 
     // Check if the authenticated user is allowed to access this teacher's batches
     // if (req.user._id !== teacherId && req.user.role !== 'admin') {

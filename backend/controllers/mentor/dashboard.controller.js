@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // File: /api/teacher/dashboard.js or similar path based on your structure
 import Teacher from '../../models/teacher.model.js';
 import Batch from '../../models/batch.model.js';
@@ -11,13 +12,45 @@ export default async function getTeacherDashboardData(req, res) {
   try {
     // Get teacher data
     const teacher = await Teacher.findById(DUMMY_TEACHER_ID);
+=======
+// File: /controllers/mentor/dashboard.controller.js
+import Teacher from '../../models/teacher.model.js';
+import Batch from '../../models/batch.model.js';
+
+export const getTeacherDashboardData = async (req, res) => {
+  try {
+    // Check if req.user exists from auth middleware
+    // If not, fallback to a dummy ID for development or use query parameter
+    let teacherId;
+
+    console.log('req.user:', req.user._id); // Debugging line to check req.user
+    
+    if (req.user && req.user._id) {
+      // If authenticated through middleware
+      teacherId = req.user._id;
+    } else if (req.query.teacherId) {
+      // Option 1: Allow ID to be passed as query parameter (for testing)
+      teacherId = req.query.teacherId;
+    } else {
+      // Option 2: Fallback to a dummy ID (for development only - remove in production)
+      teacherId = '680289d9994a95276bcd8b79'; // Your original dummy ID
+      console.log('Warning: Using fallback teacher ID - auth not properly set up');
+    }
+
+    // Get teacher data
+    const teacher = await Teacher.findById(teacherId);
+>>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
     
     if (!teacher) {
       return res.status(404).json({ message: 'Teacher not found' });
     }
 
     // Get recent batches
+<<<<<<< HEAD
     const recentBatches = await Batch.find({ teacher: DUMMY_TEACHER_ID })
+=======
+    const recentBatches = await Batch.find({ teacher: teacherId })
+>>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
       .sort({ startDate: -1 })
       .limit(5);
 

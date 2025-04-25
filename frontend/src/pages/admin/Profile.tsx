@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,34 +6,157 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Upload, Mail, Phone, User, MapPin, Briefcase, Calendar, Shield, Edit } from 'lucide-react';
+import { Upload, Mail, Phone, User, MapPin, Briefcase, Calendar, Shield, Edit, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const AdminProfile = () => {
-  // Initial profile state
+  // Initial profile state with empty values
   const [profile, setProfile] = useState({
-    name: "Alex Rodriguez",
-    email: "alex.rodriguez@oll.co",
-    phone: "+1 (555) 987-6543",
-    location: "San Francisco, CA",
-    bio: "OLL Business Bootcamp program administrator. Responsible for overseeing all mentors, students, and program operations.",
-    jobTitle: "Program Administrator",
-    yearsExperience: 7,
-    department: "Education Operations",
-    responsibilities: [
-      "Mentor management and recruitment",
-      "Student enrollment coordination",
-      "Program curriculum oversight",
-      "Financial reporting and analysis"
-    ]
+    name: "",
+    email: "",
+    phone: "",
+    jobTitle: "",
+    department: "",
+    bio: "",
+    responsibilities: [],
+    location: "Not specified"
   });
+  
+  // Platform statistics state
+  const [stats, setStats] = useState({
+    totalBatches: 0,
+    activeStudents: 0,
+    activeMentors: 0,
+    totalRevenue: 0
+  });
+  
+  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
   
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState({...profile});
   
+  // Fetch admin profile data
+  useEffect(() => {
+    const fetchAdminProfile = async () => {
+      try {
+        // Get admin ID from localStorage
+        const adminId = localStorage.getItem('id');
+        
+        if (!adminId) {
+          toast({
+            title: "Authentication Error",
+            description: "Admin ID not found. Please login again.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        const response = await fetch(`http://localhost:5000/api/admin/${adminId}`);
+        
+        if (response.ok) {
+          const adminData = await response.json();
+          
+          // Map the fetched data to our profile state structure
+          setProfile({
+            name: adminData.name || "",
+            email: adminData.email || "",
+            phone: adminData.phone || "",
+            jobTitle: adminData.jobTitle || "",
+            department: adminData.department || "",
+            bio: adminData.bio || "",
+            responsibilities: adminData.responsibilities || [],
+            location: adminData.location || "Not specified"
+          });
+          
+          // Also update the editedProfile state
+          setEditedProfile({
+            name: adminData.name || "",
+            email: adminData.email || "",
+            phone: adminData.phone || "",
+            jobTitle: adminData.jobTitle || "",
+            department: adminData.department || "",
+            bio: adminData.bio || "",
+            responsibilities: adminData.responsibilities || [],
+            location: adminData.location || "Not specified"
+          });
+        } else {
+          toast({
+            title: "Failed to load profile",
+            description: "Could not retrieve admin profile data",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching admin profile:", error);
+        toast({
+          title: "Network error",
+          description: "Failed to connect to the server",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAdminProfile();
+  }, []);
+  
+  // Fetch platform statistics
+  useEffect(() => {
+    const fetchPlatformStats = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/batches');
+        
+        if (response.ok) {
+          const batches = await response.json();
+          
+          // Calculate statistics from batches data
+          let totalStudentsCount = 0;
+          let totalMentorsCount = new Set(); // Use Set to avoid counting duplicates
+          let totalRevenueAmount = 0;
+          
+          batches.forEach(batch => {
+            // Count unique students
+            if (batch.students && Array.isArray(batch.students)) {
+              totalStudentsCount += batch.students.length;
+            }
+            
+            // Count unique teachers/mentors
+            if (batch.teacher) {
+              totalMentorsCount.add(batch.teacher);
+            }
+            
+            // Sum up revenue
+            if (batch.revenue) {
+              totalRevenueAmount += batch.revenue;
+            }
+          });
+          
+          setStats({
+            totalBatches: batches.length,
+            activeStudents: totalStudentsCount,
+            activeMentors: totalMentorsCount.size,
+            totalRevenue: totalRevenueAmount
+          });
+        } else {
+          console.error("Failed to fetch batch data");
+        }
+      } catch (error) {
+        console.error("Error fetching platform statistics:", error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    
+    fetchPlatformStats();
+  }, []);
+  
   // Handle input changes when editing
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setEditedProfile({
       ...editedProfile,
@@ -45,32 +167,35 @@ const AdminProfile = () => {
   // Save profile changes
   const handleSave = async () => {
     try {
-      // Create a complete profile object that preserves all properties
-      const completeProfile = {
-        ...profile,        // Start with all properties from original profile
-        ...editedProfile,  // Override with edited values
-      };
-  
-      const response = await fetch("http://localhost:5000/api/profile", {
-        method: "POST",
+      setSavingProfile(true);
+      
+      const adminId = localStorage.getItem('id');
+      if (!adminId) {
+        toast({
+          title: "Authentication Error",
+          description: "Admin ID not found. Please login again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/admin/${adminId}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(completeProfile)
+        body: JSON.stringify(editedProfile)
       });
   
       if (response.ok) {
-        const result = await response.json();
+        const updatedAdmin = await response.json();
         
-        // Ensure the result has all the properties we need, falling back to our local data
-        const updatedProfile = {
-          ...completeProfile,  // Use our complete local data as fallback
-          ...result,           // Override with server data when available
-          // Ensure responsibilities is always an array
-          responsibilities: result.responsibilities || completeProfile.responsibilities || []
-        };
+        // Update profile state with the returned data
+        setProfile({
+          ...profile,
+          ...editedProfile
+        });
         
-        setProfile(updatedProfile);
         setIsEditing(false);
         toast({
           title: "Profile updated",
@@ -78,7 +203,7 @@ const AdminProfile = () => {
         });
       } else {
         // Try to parse the error
-        let errorMessage = "Something went wrong.";
+        let errorMessage = "Failed to update profile.";
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
@@ -96,9 +221,11 @@ const AdminProfile = () => {
       console.error("Profile update error:", error);
       toast({
         title: "Network error",
-        description: "Failed to connect to the server.",
+        description: "Failed to connect to the server",
         variant: "destructive"
       });
+    } finally {
+      setSavingProfile(false);
     }
   };
   
@@ -107,6 +234,25 @@ const AdminProfile = () => {
     setEditedProfile({...profile});
     setIsEditing(false);
   };
+  
+  // Format currency amount
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+  
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading profile data...</p>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -158,14 +304,6 @@ const AdminProfile = () => {
                 Department
               </h3>
               <p className="text-sm">{profile.department}</p>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-2 flex items-center">
-                <Calendar className="h-4 w-4 mr-2" />
-                Experience
-              </h3>
-              <p className="text-sm">{profile.yearsExperience} years</p>
             </div>
           </CardContent>
         </Card>
@@ -227,27 +365,14 @@ const AdminProfile = () => {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="yearsExperience">Years of Experience</Label>
-                    <Input 
-                      id="yearsExperience"
-                      name="yearsExperience"
-                      type="number"
-                      value={editedProfile.yearsExperience}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Input 
-                      id="department"
-                      name="department"
-                      value={editedProfile.department}
-                      onChange={handleChange}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input 
+                    id="department"
+                    name="department"
+                    value={editedProfile.department}
+                    onChange={handleChange}
+                  />
                 </div>
                 
                 <div className="space-y-2">
@@ -263,10 +388,11 @@ const AdminProfile = () => {
               </div>
               
               <div className="flex justify-end space-x-3">
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="outline" onClick={handleCancel} disabled={savingProfile}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>
+                <Button onClick={handleSave} disabled={savingProfile}>
+                  {savingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Changes
                 </Button>
               </div>
@@ -302,24 +428,30 @@ const AdminProfile = () => {
           <CardDescription>Overall platform performance metrics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="border rounded-md p-4">
-              <p className="text-sm text-muted-foreground">Total Batches</p>
-              <p className="text-2xl font-bold">12</p>
+          {statsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-            <div className="border rounded-md p-4">
-              <p className="text-sm text-muted-foreground">Active Students</p>
-              <p className="text-2xl font-bold">243</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="border rounded-md p-4">
+                <p className="text-sm text-muted-foreground">Total Batches</p>
+                <p className="text-2xl font-bold">{stats.totalBatches}</p>
+              </div>
+              <div className="border rounded-md p-4">
+                <p className="text-sm text-muted-foreground">Active Students</p>
+                <p className="text-2xl font-bold">{stats.activeStudents}</p>
+              </div>
+              <div className="border rounded-md p-4">
+                <p className="text-sm text-muted-foreground">Active Mentors</p>
+                <p className="text-2xl font-bold">{stats.activeMentors}</p>
+              </div>
+              <div className="border rounded-md p-4">
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p>
+              </div>
             </div>
-            <div className="border rounded-md p-4">
-              <p className="text-sm text-muted-foreground">Active Mentors</p>
-              <p className="text-2xl font-bold">18</p>
-            </div>
-            <div className="border rounded-md p-4">
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold">$45,600</p>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
