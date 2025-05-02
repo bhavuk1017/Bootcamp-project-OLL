@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import axios from "axios";
+import { useAuth } from '@/context/AuthContext';
 import { 
   Table, 
   TableBody, 
@@ -74,6 +75,7 @@ import {
 
 const AdminStudents = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
@@ -97,7 +99,7 @@ const AdminStudents = () => {
       name: '',
       email: '',
       phone: '',
-      batches: [], // Changed from batch to batches to match schema
+      batches: '', // Changed from array to string to match the UI
       age: '',
       school: '',
       password: ''
@@ -109,7 +111,7 @@ const AdminStudents = () => {
       name: '',
       email: '',
       phone: '',
-      batches: [], // Changed from batch to batches to match schema
+      batches: '', // Changed from array to string to match the UI
       age: '',
       school: ''
     }
@@ -119,9 +121,18 @@ const AdminStudents = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
       const [studentsRes, batchesRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/students"),
-        axios.get("http://localhost:5000/api/batches")
+        axios.get("http://localhost:5000/api/students", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }),
+        axios.get("http://localhost:5000/api/batches", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
       ]);
       
       setStudentsData(studentsRes.data);
@@ -158,6 +169,7 @@ const AdminStudents = () => {
   const handleAddStudent = async (data) => {
     setIsSubmitting(true);
     try {
+      const token = localStorage.getItem('token');
       // Convert batch name to batch ID and put in an array
       const batchId = batchNameToIdMap[data.batches];
       const studentData = {
@@ -165,7 +177,11 @@ const AdminStudents = () => {
         batches: batchId ? [batchId] : [] // Use an array of batch IDs as per schema
       };
       
-      const response = await axios.post("http://localhost:5000/api/students", studentData);
+      const response = await axios.post("http://localhost:5000/api/students", studentData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       toast({
         title: "Student added",
         description: "New student has been successfully added"
@@ -218,6 +234,7 @@ const AdminStudents = () => {
     
     setIsSubmitting(true);
     try {
+      const token = localStorage.getItem('token');
       // Convert batch name to batch ID
       const batchId = batchNameToIdMap[data.batches];
       
@@ -226,9 +243,16 @@ const AdminStudents = () => {
         batches: batchId ? [batchId] : [] // Use an array of batch IDs as per schema
       };
       
+      console.log('Updating student with data:', studentData); // Debug log
+      
       const response = await axios.patch(
         `http://localhost:5000/api/students/${currentStudent._id}`, 
-        studentData
+        studentData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       );
       
       toast({
@@ -262,7 +286,12 @@ const AdminStudents = () => {
     
     setIsSubmitting(true);
     try {
-      await axios.delete(`http://localhost:5000/api/students/${currentStudent._id}`);
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://localhost:5000/api/students/${currentStudent._id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       toast({
         title: "Student deleted",
@@ -654,7 +683,10 @@ const AdminStudents = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assign to Batch</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value)} 
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a batch" />
@@ -783,7 +815,10 @@ const AdminStudents = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assigned Batch</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value)} 
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a batch" />

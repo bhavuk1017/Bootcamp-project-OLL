@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Mail, Phone, School, Calendar, MapPin, GraduationCap, Users, Clock, CheckSquare } from 'lucide-react';
 import  UserAvatar  from '@/components/ui-custom/UserAvatar'; // Assuming you have this component
+import { useAuth } from '@/context/AuthContext';
 
 const AdminStudentDetails = () => {
   const { studentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [studentData, setStudentData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,7 +17,13 @@ const AdminStudentDetails = () => {
   useEffect(() => {
     const fetchStudentData = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/students/${studentId}`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/students/${studentId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
         if (!response.ok) {
           throw new Error(`Failed to fetch student data: ${response.status}`);
         }

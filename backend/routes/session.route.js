@@ -3,9 +3,60 @@ import express from "express";
 import Session from "../models/session.model.js";
 import Batch from "../models/batch.model.js";
 import Teacher from "../models/teacher.model.js";
+import Student from "../models/student.model.js";
 import { protect, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
+
+// Get sessions for a specific student - MUST BE BEFORE THE /:id ROUTE
+router.get("/student", protect, async (req, res) => {
+  try {
+    // Get student ID from authenticated user 
+    const studentId = req.user._id;
+    
+    // Find student to get their batches
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get all batches for this student
+    const studentBatches = student.batches || [];
+    
+    // Find all sessions that belong to these batches
+    const sessions = await Session.find({ batch: { $in: studentBatches } })
+      .populate('batch', 'batchName')
+      .sort({ date: 1 });
+
+    // Format response with additional info
+    const formattedSessions = sessions.map(session => {
+      const sessionObject = session.toObject();
+      
+      // Add derived status (upcoming or completed)
+      const sessionDate = new Date(session.date);
+      const today = new Date();
+      sessionObject.status = sessionDate >= today ? 'upcoming' : 'completed';
+      
+      // Add batch name
+      sessionObject.batchName = session.batch?.batchName || 'Unknown Batch';
+      
+      return {
+        id: sessionObject._id,
+        title: sessionObject.title,
+        date: sessionObject.date,
+        time: sessionObject.time,
+        status: sessionObject.status,
+        batchName: sessionObject.batchName,
+        notes: sessionObject.notes
+      };
+    });
+
+    res.status(200).json(formattedSessions);
+  } catch (error) {
+    console.error("Failed to fetch student sessions:", error);
+    res.status(500).json({ error: "Failed to fetch student sessions" });
+  }
+});
 
 // Create a new session
 router.post("/", async (req, res) => {

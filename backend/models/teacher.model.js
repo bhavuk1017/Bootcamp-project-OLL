@@ -22,13 +22,10 @@ const teacherSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-<<<<<<< HEAD
-=======
   role: {
     type: String,
     default: 'Mentor',
   },
->>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
   rating: {
     type: Number,
     default: 0

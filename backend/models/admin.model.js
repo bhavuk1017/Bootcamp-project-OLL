@@ -47,13 +47,10 @@ const adminSchema = new mongoose.Schema({
   role: {
     type: String,
     default: 'Admin'
-<<<<<<< HEAD
-=======
   },
   location: {
     type: String,
     default: ""
->>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
   }
 }, {
   timestamps: true

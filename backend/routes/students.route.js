@@ -4,116 +4,116 @@ import Student from "../models/student.model.js"; // Assuming you have a Student
 import Batch from "../models/batch.model.js"; // Assuming you have a Batch model
 import Teacher from "../models/teacher.model.js"; // Assuming you have a Teacher model
 import { updateStudent } from "../controllers/studentUpdate.controller.js";
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(protect);
 
 router.post("/", createStudent); // notice just "/", because prefix is used in app.js
 
 router.get("/", async (req, res) => {
   try {
-    const students = await Student.find();
+    const students = await Student.find().select('-password');
     res.status(200).json(students);
   } catch (error) {
-    console.error("Failed to fetch teachers:", error);
-    res.status(500).json({ message: "Failed to fetch teachers" });
+    console.error("Failed to fetch students:", error);
+    res.status(500).json({ message: "Failed to fetch students" });
   }
 });
 
 // Get single student
 router.get("/:id", async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    const student = await Student.findById(req.params.id).select('-password');
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
     res.json(student);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Update student
+// Update student profile
 router.patch("/:id", async (req, res) => {
   try {
     const studentId = req.params.id;
-    const { name, email, batches } = req.body;
+    const { name, email, phone, location, school, grade, batches } = req.body;
 
-    // Step 1: Get existing student
-    const existingStudent = await Student.findById(studentId).populate(
-      "batches"
-    );
+    // Check if student exists
+    const existingStudent = await Student.findById(studentId);
     if (!existingStudent) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const oldBatchId = existingStudent.batches[0]?._id?.toString(); // assuming single batch
-    const newBatchId = batches[0]; // From frontend: [batchId]
+    // Handle batch updates if provided
+    if (batches && batches.length > 0) {
+      const oldBatchId = existingStudent.batches && existingStudent.batches.length > 0 
+        ? existingStudent.batches[0].toString() 
+        : null;
+      const newBatchId = batches[0];
 
-    // Step 2: Update student info
+      // Always update batch references, even if it's the same batch
+      if (oldBatchId) {
+        // Remove student from old batch
+        await Batch.findByIdAndUpdate(oldBatchId, {
+          $pull: { students: studentId }
+        });
+      }
+
+      // Add student to new batch
+      await Batch.findByIdAndUpdate(newBatchId, {
+        $addToSet: { students: studentId }
+      });
+
+      // Update teacher records if batch changed
+      if (oldBatchId && oldBatchId !== newBatchId) {
+        const oldBatch = await Batch.findById(oldBatchId);
+        const newBatch = await Batch.findById(newBatchId);
+
+        const oldTeacherId = oldBatch?.teacher?.toString();
+        const newTeacherId = newBatch?.teacher?.toString();
+
+        if (oldTeacherId && oldTeacherId !== newTeacherId) {
+          // Remove student from old teacher
+          await Teacher.findByIdAndUpdate(oldTeacherId, {
+            $pull: { students: studentId }
+          });
+
+          // Add student to new teacher
+          if (newTeacherId) {
+            await Teacher.findByIdAndUpdate(newTeacherId, {
+              $addToSet: { students: studentId }
+            });
+          }
+        }
+      }
+    }
+
+    // Update student profile
     const updatedStudent = await Student.findByIdAndUpdate(
       studentId,
       {
         name,
         email,
-        batches: [newBatchId],
+        phone,
+        location,
+        school,
+        grade,
+        ...(batches && { batches })
       },
       { new: true, runValidators: true }
-    );
+    ).select('-password');
 
-    // Step 3: Update batch records
-    if (oldBatchId && oldBatchId !== newBatchId) {
-      // Remove student from old batch
-      await Batch.findByIdAndUpdate(oldBatchId, {
-        $pull: { students: studentId },
-      });
-
-      // Add student to new batch
-      await Batch.findByIdAndUpdate(newBatchId, {
-        $addToSet: { students: studentId },
-      });
-
-      // Step 4: Update teacher records
-      const oldBatch = await Batch.findById(oldBatchId);
-      const newBatch = await Batch.findById(newBatchId);
-
-      const oldTeacherId = oldBatch?.teacher?.toString();
-      const newTeacherId = newBatch?.teacher?.toString();
-
-      if (oldTeacherId && oldTeacherId !== newTeacherId) {
-        await Teacher.findByIdAndUpdate(oldTeacherId, {
-          $pull: { students: studentId },
-        });
-
-        await Teacher.findByIdAndUpdate(newTeacherId, {
-          $addToSet: { students: studentId },
-        });
-
-        // Remove the old teacher
-        await Student.findByIdAndUpdate(studentId, {
-          $pull: { teachers: oldTeacherId },
-        });
-
-        // Add the new teacher
-        await Student.findByIdAndUpdate(studentId, {
-          $addToSet: { teachers: newTeacherId },
-        });
-      } else if (oldTeacherId === newTeacherId) {
-        // Same teacher? Just make sure the student has them
-        await Teacher.findByIdAndUpdate(oldTeacherId, {
-          $addToSet: { students: studentId },
-        });
-
-        await Student.findByIdAndUpdate(studentId, {
-          $addToSet: { teachers: oldTeacherId },
-        });
-      }
+    res.json(updatedStudent);
+  } catch (err) {
+    console.error("Error updating student:", err);
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message });
     }
-
-    res.status(200).json({
-      message: "Student updated successfully",
-      student: updatedStudent,
-    });
-  } catch (error) {
-    console.error("Error updating student:", error);
-    res.status(500).json({ message: "Failed to update student" });
+    res.status(500).json({ message: err.message });
   }
 });
 

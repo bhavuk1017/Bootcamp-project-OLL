@@ -1,18 +1,3 @@
-<<<<<<< HEAD
-// File: /api/teacher/dashboard.js or similar path based on your structure
-import Teacher from '../../models/teacher.model.js';
-import Batch from '../../models/batch.model.js';
-
-export default async function getTeacherDashboardData(req, res) {
-  // For development purposes only - this will be replaced with proper auth later
-  const DUMMY_TEACHER_ID = '680289d9994a95276bcd8b79'; // Replace with a valid ObjectId in your DB
-  // Once auth is implemented, get teacherId from the JWT token
-  // const teacherId = req.user.id;
-
-  try {
-    // Get teacher data
-    const teacher = await Teacher.findById(DUMMY_TEACHER_ID);
-=======
 // File: /controllers/mentor/dashboard.controller.js
 import Teacher from '../../models/teacher.model.js';
 import Batch from '../../models/batch.model.js';
@@ -39,18 +24,13 @@ export const getTeacherDashboardData = async (req, res) => {
 
     // Get teacher data
     const teacher = await Teacher.findById(teacherId);
->>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
     
     if (!teacher) {
       return res.status(404).json({ message: 'Teacher not found' });
     }
 
     // Get recent batches
-<<<<<<< HEAD
-    const recentBatches = await Batch.find({ teacher: DUMMY_TEACHER_ID })
-=======
     const recentBatches = await Batch.find({ teacher: teacherId })
->>>>>>> 59737453444889fddb9d37bd6cf6f6c5b44bc1ed
       .sort({ startDate: -1 })
       .limit(5);
 

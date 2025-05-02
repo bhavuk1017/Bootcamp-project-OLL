@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.route.js';
 import dashboardRoutes from "./routes/dashboard-stats.route.js";
 import sessionRoutes from "./routes/session.route.js";
 import adminRoutes from "./routes/admin.route.js";
+import salesRoutes from "./routes/sales.route.js";
 
 dotenv.config();
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/profile", profileRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/sales', salesRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

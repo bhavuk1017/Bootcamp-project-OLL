@@ -10,35 +10,51 @@ export const protect = async (req, res, next) => {
     let token;
     if (req.headers.authorization?.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // Check all models for the user
-      let user = await Student.findById(decoded.id);
-      let userType = 'Student';
-      
-      if (!user) {
-        user = await Teacher.findById(decoded.id);
-        userType = 'Teacher';
+      if (!token) {
+        return res.status(401).json({ message: 'Not authorized, no token' });
       }
       
-      if (!user) {
-        user = await Admin.findById(decoded.id);
-        userType = 'Admin';
+      try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        if (!decoded || !decoded.id) {
+          return res.status(401).json({ message: 'Not authorized, invalid token' });
+        }
+        
+        // Check all models for the user
+        let user = await Student.findById(decoded.id);
+        let userType = 'Student';
+        
+        if (!user) {
+          user = await Teacher.findById(decoded.id);
+          userType = 'Teacher';
+        }
+        
+        if (!user) {
+          user = await Admin.findById(decoded.id);
+          userType = 'Admin';
+        }
+        
+        if (!user) {
+          return res.status(401).json({ message: 'Not authorized, user not found' });
+        }
+        
+        // Add user and explicit userType to the request
+        req.user = user;
+        req.userType = userType;
+        next();
+      } catch (error) {
+        console.error('Token verification error:', error);
+        return res.status(401).json({ message: 'Not authorized, token failed' });
       }
-      
-      if (!user) {
-        return res.status(401).json({ message: 'Not authorized' });
-      }
-      
-      // Add user and explicit userType to the request
-      req.user = user;
-      req.userType = userType;
-      next();
     } else {
-      res.status(401).json({ message: 'Not authorized, no token' });
+      return res.status(401).json({ message: 'Not authorized, no token' });
     }
   } catch (error) {
-    res.status(401).json({ message: 'Not authorized, token failed' });
+    console.error('Auth middleware error:', error);
+    return res.status(500).json({ message: 'Server error in authentication' });
   }
 };
 
